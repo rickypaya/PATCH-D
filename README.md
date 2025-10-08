@@ -1,8 +1,7 @@
 # PATCH'D - Project Division & 2-Week Sprint Plan
 
-## 📁 File Structure & Team Assignments
 
-### File 1: **Models.swift** (Teammate 1)
+### File 1: **Models.swift**
 **Purpose:** All data models and structures for the application
 
 **Contains:**
@@ -16,7 +15,7 @@
 
 ---
 
-### File 2: **DatabaseManager.swift** (Teammate 2)
+### File 2: **DatabaseManager.swift**
 **Purpose:** All Supabase database operations and API calls
 
 **Contains:**
@@ -30,7 +29,7 @@
 
 ---
 
-### File 3: **PhotoManager.swift** (Teammate 3)
+### File 3: **PhotoManager.swift**
 **Purpose:** Camera, image processing, and photo placement logic
 
 **Contains:**
@@ -44,7 +43,7 @@
 
 ---
 
-### File 4: **AppState.swift + Views** (Teammate 4)
+### File 4: **AppState.swift + Views**
 **Purpose:** Application state management and all SwiftUI views
 
 **Contains:**
@@ -66,19 +65,19 @@
 
 #### **Teammate 1 - Models (Days 1-7)**
 
-**Days 1-2: Core Models**
+**Part 1: Core Models**
 - [ ] Create `User` model with all properties (id, email, username, createdAt, profileImageUrl)
 - [ ] Create `CollageSession` model with relationships (id, theme, startTime, endTime, createdBy, participants array, photos array, inviteCode)
 - [ ] Create `CollagePhoto` model (id, userId, username, imageUrl, position, size, rotation, aspectRatio, uploadedAt)
 - [ ] Add Codable conformance to all models for Supabase JSON parsing
 
-**Days 3-4: Supporting Models**
+**Part 2: Supporting Models**
 - [ ] Create `Theme` model (id, text, category, isActive)
 - [ ] Create `Invite` model (code, collageId, createdBy, expiresAt, maxUses, currentUses)
 - [ ] Create `Collage` model as main database representation
 - [ ] Add computed properties for time remaining, isExpired, participantCount
 
-**Days 5-7: Enums & Extensions**
+**Part 3: Enums & Extensions**
 - [ ] Create `CollageStatus` enum (active, expired, cancelled)
 - [ ] Create `PhotoUploadStatus` enum (uploading, processing, completed, failed)
 - [ ] Add Date extensions for ISO8601 formatting
@@ -88,9 +87,9 @@
 
 ---
 
-#### **Teammate 2 - Database Manager (Days 1-7)**
+#### **Database Manager (Week 1)**
 
-**Days 1-2: Supabase Setup**
+**Part 1: Supabase Setup**
 - [ ] Set up Supabase project and get credentials
 - [ ] Configure `SupabaseManager` singleton with URL and anon key
 - [ ] Implement `signUp(email:password:)` method
@@ -99,7 +98,7 @@
 - [ ] Implement `getCurrentUser()` method
 - [ ] Add session persistence handling
 
-**Days 3-4: Collage Operations**
+**Part 2: Collage Operations**
 - [ ] Implement `fetchRandomTheme()` with proper error handling
 - [ ] Implement `createCollage(theme:duration:)` with user as creator
 - [ ] Implement `joinCollage(collageId:)` with validation
@@ -107,14 +106,14 @@
 - [ ] Implement `fetchActiveSessions(for:)` filtering by user
 - [ ] Add `leaveCollage(collageId:)` method
 
-**Days 5-6: Photo & Storage Operations**
+**Part 3: Photo & Storage Operations**
 - [ ] Implement `uploadPhotoToStorage(image:collageId:)` to Supabase Storage
 - [ ] Implement `insertPhotoMetadata(photo:)` to photos table
 - [ ] Implement `fetchPhotosForCollage(collageId:)` query
 - [ ] Implement `deletePhoto(photoId:)` with storage cleanup
 - [ ] Add photo URL generation with signed URLs
 
-**Day 7: Invite System & Polish**
+**Part 4: Invite System & Polish**
 - [ ] Implement `generateInviteCode(collageId:)` with unique codes
 - [ ] Implement `validateInviteCode(code:)` with expiry checking
 - [ ] Implement `getCollageIdFromInvite(code:)` lookup
@@ -124,9 +123,9 @@
 
 ---
 
-#### **Teammate 3 - Photo Manager (Days 1-7)**
+#### **Photo Manager (Week 1)**
 
-**Days 1-2: Camera Integration**
+** Camera Integration**
 - [ ] Create `CameraManager` class with AVFoundation setup
 - [ ] Implement camera permission request handling
 - [ ] Create camera preview layer
@@ -135,7 +134,7 @@
 - [ ] Add flash control
 - [ ] Handle camera session lifecycle
 
-**Days 3-4: Image Processing**
+**Image Processing**
 - [ ] Create `PhotoProcessor` class
 - [ ] Implement random crop logic (choose random portrait/landscape section)
 - [ ] Implement manual crop with draggable frame
@@ -144,7 +143,7 @@
 - [ ] Add image orientation correction
 - [ ] Create crop preview UI
 
-**Days 5-6: Collage Layout System**
+**Collage Layout System**
 - [ ] Create `CollageLayoutManager` class
 - [ ] Implement random position generation within bounds
 - [ ] Add collision detection to prevent photo overlap
@@ -153,7 +152,7 @@
 - [ ] Implement rotation gestures
 - [ ] Add snap-to-grid optional feature
 
-**Day 7: Photo Upload Pipeline**
+**Photo Upload Pipeline**
 - [ ] Integrate camera → crop → compress workflow
 - [ ] Connect to DatabaseManager for storage upload
 - [ ] Add upload progress tracking
@@ -164,9 +163,9 @@
 
 ---
 
-#### **Teammate 4 - AppState & Views (Days 1-7)**
+#### **AppState & Views (Week 1)**
 
-**Days 1-2: App State Management**
+**App State Management**
 - [ ] Create comprehensive `AppState` ObservableObject
 - [ ] Add @Published properties (currentUser, activeSessions, selectedSession, etc.)
 - [ ] Implement authentication state management
@@ -175,7 +174,7 @@
 - [ ] Add error state handling with user-friendly messages
 - [ ] Set up Combine publishers for state updates
 
-**Days 3-4: Authentication & Onboarding**
+**Authentication & Onboarding**
 - [ ] Design and implement `AuthenticationView` UI
 - [ ] Add email/password validation
 - [ ] Create sign-up flow with username selection
@@ -184,7 +183,7 @@
 - [ ] Create onboarding tutorial (optional)
 - [ ] Add password reset flow
 
-**Days 5-6: Dashboard & Navigation**
+**Dashboard & Navigation**
 - [ ] Design and implement `DashboardView` with collage list
 - [ ] Add "Create Collage" button with loading state
 - [ ] Add "Join Collage" button with code input
@@ -193,7 +192,7 @@
 - [ ] Add empty state when no collages exist
 - [ ] Implement navigation to CollageView
 
-**Day 7: Core Views**
+**Core Views**
 - [ ] Create `JoinCollageView` with code input validation
 - [ ] Build basic `CollageView` canvas structure
 - [ ] Add camera button integration
@@ -206,9 +205,9 @@
 
 ### 🗓️ Week 2: Polish, Integration & Testing
 
-#### **Teammate 1 - Models (Days 8-14)**
+#### **Models (Week 2)**
 
-**Days 8-9: Advanced Features**
+**Advanced Features**
 - [ ] Add pagination support to models
 - [ ] Create `CollageStats` model (photoCount, participantCount, etc.)
 - [ ] Add `Notification` model for push notifications
@@ -216,7 +215,7 @@
 - [ ] Implement model caching strategies
 - [ ] Add model versioning for migrations
 
-**Days 10-12: Data Validation & Edge Cases**
+**Data Validation & Edge Cases**
 - [ ] Add comprehensive input validation
 - [ ] Handle nil/optional values gracefully
 - [ ] Create mock data generators for testing
@@ -224,7 +223,7 @@
 - [ ] Test Codable with real Supabase responses
 - [ ] Document all model properties and relationships
 
-**Days 13-14: Testing & Documentation**
+**Testing & Documentation**
 - [ ] Write unit tests for all models
 - [ ] Test edge cases (expired sessions, invalid data)
 - [ ] Create model documentation
@@ -233,30 +232,30 @@
 
 ---
 
-#### **Teammate 2 - Database Manager (Days 8-14)**
+#### ** Database Manager (Week 2)**
 
-**Days 8-9: Real-time Features**
+**Real-time Features**
 - [ ] Implement real-time photo updates using Supabase Realtime
 - [ ] Add real-time participant list updates
 - [ ] Implement collage expiration notifications
 - [ ] Add connection status monitoring
 - [ ] Handle reconnection logic
 
-**Days 10-11: Performance & Optimization**
+**Performance & Optimization**
 - [ ] Add database query optimization
 - [ ] Implement pagination for large photo sets
 - [ ] Add caching layer for frequently accessed data
 - [ ] Optimize image upload with concurrent uploads
 - [ ] Add request queuing for offline support
 
-**Days 12-13: Error Handling & Edge Cases**
+**Error Handling & Edge Cases**
 - [ ] Add comprehensive error handling
 - [ ] Implement retry logic with exponential backoff
 - [ ] Handle network disconnections gracefully
 - [ ] Add conflict resolution for concurrent edits
 - [ ] Test with poor network conditions
 
-**Day 14: Testing & Documentation**
+**Testing & Documentation**
 - [ ] Write integration tests
 - [ ] Test all CRUD operations
 - [ ] Load test with multiple users
@@ -265,30 +264,30 @@
 
 ---
 
-#### **Teammate 3 - Photo Manager (Days 8-14)**
+#### **Photo Manager (Days 8-14)**
 
-**Days 8-9: Advanced Camera Features**
+**Advanced Camera Features**
 - [ ] Add photo filters/effects
 - [ ] Implement timer for delayed capture
 - [ ] Add burst mode for multiple photos
 - [ ] Implement photo gallery selection (pick from library)
 - [ ] Add video thumbnail extraction (bonus feature)
 
-**Days 10-11: Enhanced Layout System**
+**Enhanced Layout System**
 - [ ] Implement smart auto-layout algorithms
 - [ ] Add layout templates (grid, spiral, random)
 - [ ] Implement photo clustering by user
 - [ ] Add animation for photo appearance
 - [ ] Implement z-index management for overlapping
 
-**Days 12-13: Polish & Optimization**
+**Polish & Optimization**
 - [ ] Optimize memory usage for large images
 - [ ] Add progressive image loading
 - [ ] Implement image caching
 - [ ] Add haptic feedback for interactions
 - [ ] Optimize collision detection performance
 
-**Day 14: Testing & Integration**
+**Testing & Integration**
 - [ ] Test camera on different devices
 - [ ] Test crop accuracy and edge cases
 - [ ] Test layout with 50+ photos
@@ -297,9 +296,9 @@
 
 ---
 
-#### **Teammate 4 - AppState & Views (Days 8-14)**
+#### **AppState & Views (Week 2)**
 
-**Days 8-9: Complete CollageView**
+**Complete CollageView**
 - [ ] Implement full photo display with gestures
 - [ ] Add "Reveal All" button when collage expires
 - [ ] Implement photo tap to view full screen
@@ -308,7 +307,7 @@
 - [ ] Add "Leave Collage" confirmation dialog
 - [ ] Implement share sheet for invite codes
 
-**Days 10-11: Additional Views**
+**Additional Views**
 - [ ] Create `ProfileView` with user stats
 - [ ] Create `SettingsView` (notifications, privacy)
 - [ ] Create `ExpiredCollageView` (show all unblurred photos)
@@ -316,7 +315,7 @@
 - [ ] Add `AboutView` with credits
 - [ ] Implement photo detail view with zoom
 
-**Days 12-13: UI Polish & Animations**
+**UI Polish & Animations**
 - [ ] Add smooth transitions between views
 - [ ] Implement loading skeletons
 - [ ] Add celebration animation when collage completes
@@ -325,7 +324,7 @@
 - [ ] Add theme-based UI customization
 - [ ] Ensure dark mode support
 
-**Day 14: Final Integration & Testing**
+**Final Integration & Testing**
 - [ ] Integrate all components together
 - [ ] End-to-end testing of all flows
 - [ ] Test on multiple devices and iOS versions
