@@ -399,4 +399,19 @@ By end of Week 2, the app should:
 - ✅ Have polished UI with smooth animations
 - ✅ Handle errors gracefully
 
+## Table Relations
+| Table                  | Purpose                                                          |
+| ---------------------- | ---------------------------------------------------------------- |
+| `users`                | Stores registered user accounts (linked to Supabase Auth).       |
+| `collages`             | Represents a collage session (with theme, start/end time, etc.). |
+| `collage_members`      | Many-to-many relation between users and collages.                |
+| `photos`               | Stores uploaded photos placed within a collage.                  |
+| `themes`               | A pool of random themes fetched when a new collage is created.   |
+| `invites` *(optional)* | Stores shareable invite codes to join a collage.                 |
+
+ Supabase storage buckets for photo uploads
+| Bucket           | Path Example                            | Access                           |
+| ---------------- | --------------------------------------- | -------------------------------- |
+| `collage-photos` | `/collages/{collage_id}/{photo_id}.jpg` | Public read, authenticated write |
+
 Good luck team! 🎉
