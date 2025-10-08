@@ -1,4 +1,4 @@
-# PATCH'D - Project Division & 2-Week Sprint Plan
+# PATCH'D - Project Division
 
 
 ### File 1: **Models.swift**
