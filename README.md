@@ -108,60 +108,78 @@ By end of Week 2, the app should:
 ## App State Functions for use in UI (To Be implemented)
 
 ## AUTHENTICATION 
-Core Auth
+### Core Auth
 
 signUpWithEmail(email:password:username:) - Create new account + collage_users entry
+
 signInWithEmail(email:password:) - Login existing user
+
 signOut() - Logout and clear state
+
 isUserAuthenticated() - Check if user has active session
+
 getCurrentUserProfile() - Get logged-in user's CollageUser profile
 
 
 ## COLLAGE MANAGEMENT
-Create Collage
+### Create Collage
 
 fetchRandomTheme() - Get one random theme from DB
+
 createNewCollage(duration:) - Create collage with random theme
+
 storeActiveCollageId(collageId:) - Save current collage to app state
 
-Join Collage
+### Join Collage
 
 joinCollageWithCode(inviteCode:) - Join by invite code
+
 validateInviteCode(code:) - Basic format check (8 characters)
 
-View Collages
+### View Collages
 
 loadUserActiveCollages() - Fetch all user's active collages
+
 loadCollageDetails(collageId:) - Fetch full collage with photos/members
+
 getTimeRemaining(collageId:) - Calculate time until expiry
+
 copyInviteCodeToClipboard(inviteCode:) - Share functionality
 
 
 ## PHOTO MANAGEMENT
-Upload Photos
+### Upload Photos
 
 openImagePicker() - Show system photo picker
+
 selectPhotoFromLibrary(image:) - Handle selected image
+
 uploadPhotoToCollage(collageId:image:) - Upload with default position/size
+
 handleUploadError(error:) - Show error message
 
-Display Photos
+### Display Photos
 
 loadPhotosForCollage(collageId:) - Fetch all photos for display
+
 refreshCollagePhotos(collageId:) - Pull-to-refresh photos
 
 
 ## ERROR HANDLING 
-Basic Error Management
+### Basic Error Management
 
 handleNetworkError(error:) - No internet message
+
 handleAuthError(error:) - Login/signup errors
+
 showErrorAlert(message:) - Generic error display
 
 
 ## UI STATE
-Navigation & Display
+### Navigation & Display
 
 navigateToCollage(collageId:) - Navigate to collage detail
+
 showLoadingIndicator() - Show/hide loading states
+
 refreshView() - Pull-to-refresh functionality
