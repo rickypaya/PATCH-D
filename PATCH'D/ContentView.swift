@@ -1,8 +1,11 @@
 //
 //  ContentView.swift
 //  PATCH'D
+//  Ricardo Payares
+//  Jericho Sanchez
+//  Janice Chung
+//  Yvette Luo
 //
-//  Created by Ricardo Payares on 10/2/25.
 //| Table                  | Purpose                                                          |
 //| ---------------------- | ---------------------------------------------------------------- |
 //| `users`                | Stores registered user accounts (linked to Supabase Auth).       |
@@ -11,7 +14,7 @@
 //| `photos`               | Stores uploaded photos placed within a collage.                  |
 //| `themes`               | A pool of random themes fetched when a new collage is created.   |
 //| `invites` *(optional)* | Stores shareable invite codes to join a collage.                 |
-
+//
 // Supabase storage buckets for photo uploads
 //| Bucket           | Path Example                            | Access                           |
 //| ---------------- | --------------------------------------- | -------------------------------- |
@@ -20,201 +23,12 @@
 
 
 import SwiftUI
-//import Supabase
 import UIKit
 import Combine
 
-//MARK: - Models
-
-
-struct CollagePhoto: Identifiable {
-    var id: UUID
-    var userId: UUID
-    var imageUrl: String
-    var position: CGPoint
-    var aspectRatio: CGFloat
-}
-
-struct CollageSession: Identifiable {
-    var id: UUID
-    var theme: String
-    var startTime: Date
-    var endTime: Date
-    var createdBy: UUID
-    var participants: [UUID]
-    var photos: [CollagePhoto]
-}
-
-//MARK: - Database Managers
-
-class SupabaseManager {
-    static let shared = SupabaseManager()
-    let client: SupabaseClient
-    
-    private init() {
-        //TODO: - setup supabase URL and anon key
-        client = SupabaseClient(
-            supabaseURL: URL(string: "https://SUPABASE_URL")!,
-            supabaseKey: "SUPABASE_ANON_KEY"
-        )
-    }
-    
-    func signIn(email: String, password: String) async throws {
-        try await client.auth.signIn(email: email, password: password)
-    }
-    
-    func signOut() async throws {
-        try await client.auth.signOut()
-    }
-}
-
-class CollageDBManager {
-    static let shared = CollageDBManager()
-    
-    private init() {}
-    
-    func fetchRandomTheme() async throws -> String {
-        //fetch a random theme from the "Themes" table in supabase
-        let result = try await SupabaseManager.shaed.client
-            .database
-            .from("themes")
-            .select()
-            .order("RANDOM()", ascending: true)
-            .limit(1)
-            .execute()
-        
-        struct ThemeRow: Decodable {let text: String}
-        let rows = try result.decoded(to: [ThemeRow].self)
-        return rows.first?.text ?? "Untitled"
-    }
-    
-    // TODO: Create collage
-    func createCollage(theme: String, duration: TimeInterval) async throws -> Collage {
-        // Insert into Supabase collages table
-        let theme = try await fetchRandomTheme()
-        let expiresAt = Date().addingTimeInterval(duration)
-        
-        //inset new collage with the theme
-        let resule = try await SupabaseManager.shared.client
-            .database
-            .from("collages")
-            .insert([
-                "title": theme,
-                "theme": theme,
-                "expires_at": expiresAt.iso8601
-            ])
-            .select()
-            .single()
-            .execute()
-        
-        return try result.decoded(to: Collage.self)
-    }
-    
-    // TODO: Join collage
-    func joinCollage(collageId: UUID) async throws {
-        // Insert into collage_members
-        fatalError("Implement join")
-    }
-    
-    // TODO: Fetch collage details
-    func fetchCollage(collageId: UUID) async throws -> Collage {
-        fatalError("Fetch collage by id")
-    }
-    
-    // TODO: Upload photo
-    func uploadPhoto(collageId: UUID, image: UIImage, cropRect: CGRect, position: CGPoint) async throws -> CollagePhoto {
-        // 1. Upload to Supabase Storage
-        // 2. Insert record into photos table
-        fatalError("Implement photo upload")
-    }
-    
-    // TODO: Fetch all active sessions for current user
-    func fetchActiveSessions(for userId: UUID, completion: @escaping ([CollageSession]) -> Void) {
-        // TODO: Query Supabase "sessions" table where participants contains userId AND endTime > now
-    }
-    
-    // TODO: Add new photo to collage
-    func uploadPhoto(sessionId: UUID, photo: CollagePhoto, completion: @escaping (Bool) -> Void) {
-        // TODO: Upload image to Supabase Storage
-        // TODO: Insert into "photos" table with collageId reference
-    }
-    
-}
-
-@MainActor
-class AppState: ObservableObject {
-    static let shared = AppState()
-    
-    @Published var currentUserId: UUID? = nil
-    @Published var activeSessions: [CollageSession] = []
-    @Published var selectedSession: CollageSession? = nil
-    @Published var showAuth: Bool = true
-    @Published var isCreatingCollage: Bool = false
-    @Published var joinCode: String = ""
-    
-    private var cancellables = Set<AnyCancellable>()
-    
-    // MARK: - Auth
-    func signIn(email: String, password: String) async {
-        do {
-            try await SupabaseManager.shared.signIn(email: email, password: password)
-            // TODO: Fetch current user ID from Supabase
-            self.currentUserId = UUID() // placeholder
-            self.showAuth = false
-            await loadActiveSessions()
-        } catch {
-            print("Error signing in:", error.localizedDescription)
-        }
-    }
-    
-    func signOut() async {
-        do {
-            try await SupabaseManager.shared.signOut()
-            self.showAuth = true
-            self.activeSessions.removeAll()
-        } catch {
-            print("Sign-out error:", error.localizedDescription)
-        }
-    }
-    
-    // MARK: - Session loading
-    func loadActiveSessions() async {
-        guard let userId = currentUserId else { return }
-        CollageDBManager.shared.fetchActiveSessions(for: userId) { sessions in
-            DispatchQueue.main.async {
-                self.activeSessions = sessions
-            }
-        }
-    }
-    
-    // MARK: - Collage creation
-    func createNewCollage(duration: TimeInterval = 600) async {
-        isCreatingCollage = true
-        do {
-            let theme = try await CollageDBManager.shared.fetchRandomTheme()
-            let newCollage = try await CollageDBManager.shared.createCollage(theme: theme, duration: duration)
-            await loadActiveSessions()
-            selectedSession = newCollage
-        } catch {
-            print("Error creating collage:", error.localizedDescription)
-        }
-        isCreatingCollage = false
-    }
-    
-    // MARK: - Join existing collage
-    func joinCollage(code: String) async {
-        // TODO: Decode invite code → collageId
-        guard let collageId = UUID(uuidString: code) else { return }
-        do {
-            try await CollageDBManager.shared.joinCollage(collageId: collageId)
-            await loadActiveSessions()
-        } catch {
-            print("Error joining collage:", error.localizedDescription)
-        }
-    }
-}
 
 //MARK: - Login View
+//TODO: - Signup View
 struct AuthenticationView: View {
     @EnvironmentObject var appState: AppState
     @State private var email = ""
@@ -240,7 +54,7 @@ struct AuthenticationView: View {
     }
 }
 
-//MARK: - Dashboard View
+//MARK: - Dashboard View shows all the current collages someone is apart of. Maybe a dock to see
 struct DashboardView: View {
     @EnvironmentObject var appState: AppState
     
