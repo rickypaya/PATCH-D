@@ -73,151 +73,6 @@
 | ---------------- | --------------------------------------- | -------------------------------- |
 | `collage-photos` | `/collages/{collage_id}/{photo_id}.jpg` | Public read, authenticated write |
 
-
-
-
-## ✅ 2-Week Sprint Task Breakdown
-
-### 🗓️ Week 1: Foundation & Core Features
-
-#### **Teammate 1 - Models (Days 1-7)**
-
-**Part 1: Core Models**
-- [x] Create `User` model with all properties (id, email, username, createdAt, profileImageUrl)
-- [x] Create `CollageSession` model with relationships (id, theme, startTime, endTime, createdBy, participants array, photos array, inviteCode)
-- [x] Create `CollagePhoto` model (id, userId, username, imageUrl, position, size, rotation, aspectRatio, uploadedAt)
-- [x] Add Codable conformance to all models for Supabase JSON parsing
-
-**Part 2: Supporting Models**
-- [x] Create `Theme` model (id, text, category, isActive)
-- [x] Create `Invite` model (code, collageId, createdBy, expiresAt, maxUses, currentUses)
-- [x] Create `Collage` model as main database representation
-- [x] Add computed properties for time remaining, isExpired, participantCount
-
-**Part 3: Enums & Extensions**
-- [x] Create `CollageStatus` enum (active, expired, cancelled)
-- [x] Create `PhotoUploadStatus` enum (uploading, processing, completed, failed)
-- [x] Add Date extensions for ISO8601 formatting
-- [x] Add UUID extensions for validation
-- [x] Create model validation methods
-- [ ] Write unit tests for models
-
----
-
-#### **Database Manager (Week 1)**
-
-**Part 1: Supabase Setup**
-- [x] Set up Supabase project and get credentials
-- [x] Configure `SupabaseManager` singleton with URL and anon key
-- [x] Implement `signUp(email:password:)` method
-- [x] Implement `signIn(email:password:)` method
-- [x] Implement `signOut()` method
-- [x] Implement `getCurrentUser()` method
-- [ ] Add session persistence handling
-
-**Part 2: Collage Operations**
-- [x] Implement `fetchRandomTheme()` with proper error handling
-- [x] Implement `createCollage(theme:duration:)` with user as creator
-- [x] Implement `joinCollage(collageId:)` with validation
-- [x] Implement `fetchCollage(collageId:)` with relationships
-- [x] Implement `fetchActiveSessions(for:)` filtering by user
-- [x] Add `leaveCollage(collageId:)` method
-
-**Part 3: Photo & Storage Operations**
-- [] Implement `uploadPhotoToStorage(image:collageId:)` to Supabase Storage
-- [ ] Implement `insertPhotoMetadata(photo:)` to photos table
-- [ ] Implement `fetchPhotosForCollage(collageId:)` query
-- [ ] Implement `deletePhoto(photoId:)` with storage cleanup
-- [ ] Add photo URL generation with signed URLs
-
-**Part 4: Invite System & Polish**
-- [ ] Implement `generateInviteCode(collageId:)` with unique codes
-- [ ] Implement `validateInviteCode(code:)` with expiry checking
-- [ ] Implement `getCollageIdFromInvite(code:)` lookup
-- [ ] Add real-time subscription setup for collage updates
-- [ ] Add error handling and retry logic
-- [ ] Write integration tests
-
----
-
-#### **Photo Manager (Week 1)**
-
-** Camera Integration**
-- [ ] Create `CameraManager` class with AVFoundation setup
-- [ ] Implement camera permission request handling
-- [ ] Create camera preview layer
-- [ ] Implement photo capture functionality
-- [ ] Add front/back camera switching
-- [ ] Add flash control
-- [ ] Handle camera session lifecycle
-
-**Image Processing**
-- [ ] Create `PhotoProcessor` class
-- [ ] Implement random crop logic (choose random portrait/landscape section)
-- [ ] Implement manual crop with draggable frame
-- [ ] Add image compression for upload optimization
-- [ ] Implement aspect ratio calculations
-- [ ] Add image orientation correction
-- [ ] Create crop preview UI
-
-**Collage Layout System**
-- [ ] Create `CollageLayoutManager` class
-- [ ] Implement random position generation within bounds
-- [ ] Add collision detection to prevent photo overlap
-- [ ] Implement drag-and-drop photo repositioning
-- [ ] Add pinch-to-zoom for photo resizing
-- [ ] Implement rotation gestures
-- [ ] Add snap-to-grid optional feature
-
-**Photo Upload Pipeline**
-- [ ] Integrate camera → crop → compress workflow
-- [ ] Connect to DatabaseManager for storage upload
-- [ ] Add upload progress tracking
-- [ ] Implement upload retry on failure
-- [ ] Add local caching for offline support
-- [ ] Optimize image loading with thumbnails
-- [ ] Test full pipeline end-to-end
-
----
-
-#### **AppState & Views (Week 1)**
-
-**App State Management**
-- [ ] Create comprehensive `AppState` ObservableObject
-- [ ] Add @Published properties (currentUser, activeSessions, selectedSession, etc.)
-- [ ] Implement authentication state management
-- [ ] Add session loading and refreshing logic
-- [ ] Implement navigation state management
-- [ ] Add error state handling with user-friendly messages
-- [ ] Set up Combine publishers for state updates
-
-**Authentication & Onboarding**
-- [ ] Design and implement `AuthenticationView` UI
-- [ ] Add email/password validation
-- [ ] Create sign-up flow with username selection
-- [ ] Add loading states and error messages
-- [ ] Implement "Remember Me" functionality
-- [ ] Create onboarding tutorial (optional)
-- [ ] Add password reset flow
-
-**Dashboard & Navigation**
-- [ ] Design and implement `DashboardView` with collage list
-- [ ] Add "Create Collage" button with loading state
-- [ ] Add "Join Collage" button with code input
-- [ ] Implement pull-to-refresh for session list
-- [ ] Show countdown timers for each active collage
-- [ ] Add empty state when no collages exist
-- [ ] Implement navigation to CollageView
-
-**Core Views**
-- [ ] Create `JoinCollageView` with code input validation
-- [ ] Build basic `CollageView` canvas structure
-- [ ] Add camera button integration
-- [ ] Implement photo display with blur logic
-- [ ] Add share button for invite codes
-- [ ] Create navigation bar with theme title
-- [ ] Add logout functionality
-
 ---
 
 ## 📱 Supabase Database Schema Reminder
@@ -250,9 +105,9 @@ By end of Week 2, the app should:
 - ✅ Handle errors gracefully
 
 --
-App State Functions for use in UI (To Be implemented)
+## App State Functions for use in UI (To Be implemented)
 
-AUTHENTICATION 
+## AUTHENTICATION 
 Core Auth
 
 signUpWithEmail(email:password:username:) - Create new account + collage_users entry
@@ -262,7 +117,7 @@ isUserAuthenticated() - Check if user has active session
 getCurrentUserProfile() - Get logged-in user's CollageUser profile
 
 
-COLLAGE MANAGEMENT
+## COLLAGE MANAGEMENT
 Create Collage
 
 fetchRandomTheme() - Get one random theme from DB
@@ -282,7 +137,7 @@ getTimeRemaining(collageId:) - Calculate time until expiry
 copyInviteCodeToClipboard(inviteCode:) - Share functionality
 
 
-PHOTO MANAGEMENT
+## PHOTO MANAGEMENT
 Upload Photos
 
 openImagePicker() - Show system photo picker
@@ -296,7 +151,7 @@ loadPhotosForCollage(collageId:) - Fetch all photos for display
 refreshCollagePhotos(collageId:) - Pull-to-refresh photos
 
 
-ERROR HANDLING 
+## ERROR HANDLING 
 Basic Error Management
 
 handleNetworkError(error:) - No internet message
@@ -304,7 +159,7 @@ handleAuthError(error:) - Login/signup errors
 showErrorAlert(message:) - Generic error display
 
 
-UI STATE
+## UI STATE
 Navigation & Display
 
 navigateToCollage(collageId:) - Navigate to collage detail
