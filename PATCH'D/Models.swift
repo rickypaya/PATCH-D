@@ -7,6 +7,14 @@ import SwiftUI
 
 // MARK: - User Models
 
+enum CurrState {
+    case signUp
+    case logIn
+    case profile
+//    case dashboard
+//    case collage
+}
+
 struct CollageUser: Identifiable, Codable {
     var id: UUID
     var email: String

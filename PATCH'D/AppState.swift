@@ -8,11 +8,12 @@ class AppState: ObservableObject {
     //MARK: - App State Variables
     
     @Published var isAuthenticated = false
-    @Published var currentUser: CollageUser?
-    @Published var currentUserId: UUID?
-    @Published var activeSessions: [CollageSession] = []
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+    @Published var currentUser: CollageUser? //logged in user profile
+    @Published var currentUserId: UUID? //logged in user id
+    @Published var activeSessions: [CollageSession] = [] //array of active collage sessions for user
+    @Published var isLoading = false //Is the app currently loading
+    @Published var errorMessage: String? //error message if any present in app state
+    @Published var currentState: CurrState = .signUp //current app page
     
     //MARK: - Private properties
     
@@ -21,13 +22,15 @@ class AppState: ObservableObject {
     
     private init() {
         Task {
+            //on launch, check if a user is logged in.
             await checkAuthStatus()
         }
     }
     
     //MARK: - Authentication
     
-    //On app launch, check if user has an active session
+    //On app launch, check if user is signed in
+    //if so fetch active collage sessions
     func checkAuthStatus() async {
         do {
             let user = try await supabase.getCurrentUser()
@@ -38,10 +41,11 @@ class AppState: ObservableObject {
             currentUser = profile
             isAuthenticated = true
             
-            //loada active collage sessions
+            //load active collage sessions
             await loadActiveSessions()
         }
         catch {
+            print("No user authenticated")
             isAuthenticated = false
             currentUser = nil
             currentUserId = nil
@@ -49,6 +53,7 @@ class AppState: ObservableObject {
         }
     }
     
+    //fetches the active collage sessions for the user
     func loadActiveSessions() async {
         guard let userId = currentUserId else {
             activeSessions = []
@@ -68,58 +73,45 @@ class AppState: ObservableObject {
         isLoading = false
     }
     
+    //refresh function
     func refreshActiveSessions() async {
         await loadActiveSessions()
     }
     
+    //handles sign in
+    //creates an entry in Supabase Auth table
+    //Updates entry in Supabase Users table
     func signUpWithEmail(email: String, password: String, username: String) async throws {
         isLoading = true
         errorMessage = nil
-        
         do {
             //create auth user with supabase auth
+            let authResp = try await supabase.signUpWithEmail(email: email, password: password)
+            let userId = authResp.user.id
+            print(userId.uuidString)
             
-            let authResponse = try await supabase.client.auth.signUp(email: email, password: password)
             
-            let userId = authResponse.user.id
-                    
-            // create user profile in colalge_users table
-            let profileData = CollageUser(
-                id: userId,
-                email: email,
-                username: username,
-                avatarUrl: nil
-            )
+            try await dbManager.updateUsername(username: username)
             
-            try await supabase.client.from("collage_users").insert(profileData).execute()
-            
-            let userProfile: CollageUser = try await supabase.client
-                .from("collage_users")
-                .select()
-                .eq("id", value: userId)
-                .single()
-                .execute()
-                .value
-            
-            //update app state
-            currentUserId = userId
-            currentUser = userProfile
-            isAuthenticated = true
-            activeSessions = []
-            
+            currentState = .logIn
         } catch {
             errorMessage = error.localizedDescription
+            print(errorMessage)
             throw error
         }
         
         isLoading = false
     }
     
+    //handles signin with email
+    //sets current userId and profile in app state
+    //loads active collage sessions
     func signInWithEmail(email: String, password: String) async throws {
         isLoading = true
         errorMessage = nil
         
         do {
+            print("In signin func")
             //sign in with supabase
             try await supabase.signIn(email: email, password: password)
             
@@ -128,21 +120,22 @@ class AppState: ObservableObject {
             currentUserId = user.id
             
             //fetch user profile
-            let profile = try await dbManager.fetchUser(userId: user.id)
-            currentUser = profile
+            try await getCurrentUserProfile()
             isAuthenticated = true
-            
             
             //load active sessions
             await loadActiveSessions()
+            currentState = .profile
         }catch {
             errorMessage = error.localizedDescription
+            print(errorMessage)
             throw error
         }
         
         isLoading = false
     }
     
+    //handles supabase db signout
     func signOut() async throws {
         isLoading = true
         errorMessage = nil
@@ -155,6 +148,7 @@ class AppState: ObservableObject {
             currentUser = nil
             currentUserId = nil
             activeSessions = []
+            currentState = .logIn
         }catch {
             errorMessage = error.localizedDescription
             throw error
@@ -194,7 +188,7 @@ class AppState: ObservableObject {
         currentUser = profile
     }
     
-    
+    //MARK: - Utilities for update collage sessions array in app state
     func addSessions (_ session: CollageSession) {
         //check if session exists
         if !activeSessions.contains(where: { $0.id == session.id }) {
@@ -216,6 +210,7 @@ class AppState: ObservableObject {
         errorMessage = nil
     }
     
+    //MARK: - Utilities for input format checking
     //validate email format
     func validateEmail(_ email: String) -> Bool {
         let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"

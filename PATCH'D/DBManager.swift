@@ -19,8 +19,14 @@ class SupabaseManager {
         )
     }
     
-    func signIn(email: String, password: String) async throws {
-        try await client.auth.signIn(email: email, password: password)
+    func signUpWithEmail(email: String, password: String) async throws -> AuthResponse {
+        let authResp = try await client.auth.signUp(email: email, password: password)
+        return authResp
+    }
+    
+    func signIn(email: String, password: String) async throws -> Session {
+        let authResp = try await client.auth.signIn(email: email, password: password)
+        return authResp
     }
     
     func signOut() async throws {
@@ -376,7 +382,7 @@ class CollageDBManager {
     
     func fetchUser(userId: UUID) async throws -> CollageUser {
         let user: CollageUser = try await supabase
-            .from("collage_users")
+            .from("users")
             .select()
             .eq("id", value: userId.uuidString)
             .single()
@@ -403,7 +409,7 @@ class CollageDBManager {
         
         // Fetch user profiles
         let users: [CollageUser] = try await supabase
-            .from("collage_users")
+            .from("users")
             .select()
             .in("id", values: userIds.map { $0.uuidString })
             .execute()
@@ -411,6 +417,27 @@ class CollageDBManager {
         
         return users
     }
+    
+    func updateUsername(username: String) async throws {
+            // Get current user
+            let user = try await SupabaseManager.shared.getCurrentUser()
+            
+            struct UsernameUpdate: Encodable {
+                let username: String
+                let updated_at: String
+            }
+            
+            let updateData = UsernameUpdate(
+                username: username,
+                updated_at: ISO8601DateFormatter().string(from: Date())
+            )
+            
+            try await supabase
+                .from("users")
+                .update(updateData)
+                .eq("id", value: user.id.uuidString)
+                .execute()
+        }
     
     //MARK: - Helper Functions
     
