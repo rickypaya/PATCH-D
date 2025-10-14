@@ -49,6 +49,7 @@ class AppState: ObservableObject {
             isAuthenticated = false
             currentUser = nil
             currentUserId = nil
+            currentState = .signUp
             activeSessions = []
         }
     }
@@ -63,10 +64,11 @@ class AppState: ObservableObject {
         isLoading = true
         
         do{
-            let sessions = try await dbManager.fetchActiveSessions(for: userId)
+            let sessions = try await dbManager.fetchSessions()
             activeSessions = sessions
         }catch {
-            errorMessage = "Failed to load sessionsL: \(error.localizedDescription)"
+            errorMessage = "Failed to load sessions: \(error.localizedDescription)"
+            print(errorMessage)
             activeSessions = []
         }
         
@@ -87,12 +89,7 @@ class AppState: ObservableObject {
         do {
             //create auth user with supabase auth
             let authResp = try await supabase.signUpWithEmail(email: email, password: password)
-            let userId = authResp.user.id
-            print(userId.uuidString)
-            
-            
             try await dbManager.updateUsername(username: username)
-            
             currentState = .logIn
         } catch {
             errorMessage = error.localizedDescription
@@ -125,7 +122,8 @@ class AppState: ObservableObject {
             
             //load active sessions
             await loadActiveSessions()
-            currentState = .profile
+            print(activeSessions)
+            currentState = .dashboard
         }catch {
             errorMessage = error.localizedDescription
             print(errorMessage)
@@ -186,24 +184,6 @@ class AppState: ObservableObject {
         
         let profile = try await dbManager.fetchUser(userId: userId)
         currentUser = profile
-    }
-    
-    //MARK: - Utilities for update collage sessions array in app state
-    func addSessions (_ session: CollageSession) {
-        //check if session exists
-        if !activeSessions.contains(where: { $0.id == session.id }) {
-            activeSessions.append(session)
-        }
-    }
-    
-    func updateSession(_ session: CollageSession) {
-        if let index = activeSessions.firstIndex(where: { $0.id == session.id }) {
-            activeSessions[index] = session
-        }
-    }
-    
-    func removeSession(sessionId: UUID) {
-        activeSessions.removeAll { $0.id == sessionId }
     }
     
     func clearError() {

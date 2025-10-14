@@ -211,16 +211,26 @@ class CollageDBManager {
         )
     }
     
-    func fetchActiveSessions(for userId: UUID) async throws -> [CollageSession] {
+    func fetchSessions() async throws -> [CollageSession] {
         // Fetch collage IDs where user is a member
+        let user = try await SupabaseManager.shared.getCurrentUser()
+        let userId = user.id
+        print("In fetch session for \(userId)")
+        
         let memberships: [CollageMember] = try await supabase
             .from("collage_members")
             .select()
-            .eq("user_id", value: userId.uuidString)
+            .eq("user_id", value: userId)
             .execute()
             .value
         
+        guard !memberships.isEmpty else {
+            print ("No memberships found for user: \(userId)")
+            return []
+        }
+        
         let collageIds = memberships.map { $0.collageId }
+        print("Found \(collageIds.count) memberships")
         
         guard !collageIds.isEmpty else {
             return []
@@ -232,7 +242,7 @@ class CollageDBManager {
             .from("collages")
             .select()
             .in("id", values: collageIds.map { $0.uuidString })
-            .gt("expires_at", value: now)
+//            .gt("expires_at", value: now)
             .execute()
             .value
         

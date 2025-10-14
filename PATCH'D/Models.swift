@@ -11,7 +11,7 @@ enum CurrState {
     case signUp
     case logIn
     case profile
-//    case dashboard
+    case dashboard
 //    case collage
 }
 
@@ -118,32 +118,6 @@ struct Photo: Identifiable, Codable {
         case rotation
         case aspectRatio = "aspect_ratio"
         case uploadedAt = "uploaded_at"
-    }
-}
-
-// MARK: - Invite Models
-
-struct Invite: Identifiable, Codable {
-    var id: UUID
-    var code: String
-    var collageId: UUID
-    var createdBy: UUID
-    var expiresAt: Date
-    var maxUses: Int?
-    var currentUses: Int
-    var createdAt: Date
-    var isActive: Bool?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case code
-        case collageId = "collage_id"
-        case createdBy = "created_by"
-        case expiresAt = "expires_at"
-        case maxUses = "max_uses"
-        case currentUses = "current_uses"
-        case createdAt = "created_at"
-        case isActive = "is_active"
     }
 }
 
