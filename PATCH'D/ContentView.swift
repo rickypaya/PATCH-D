@@ -26,6 +26,22 @@ import SwiftUI
 import UIKit
 import Combine
 
+//MARK: - Default Avatar View (temporary)
+func defaultMemberAvatar(for member: CollageUser) -> some View {
+        Circle()
+            .fill(Color.blue.opacity(0.7))
+            .frame(width: 35, height: 35)
+            .overlay(
+                Text(member.username.prefix(1).uppercased())
+                    .font(.caption.bold())
+                    .foregroundColor(.white)
+            )
+            .overlay(
+                Circle()
+                    .stroke(Color.black, lineWidth: 2)
+            )
+    }
+
 //MARK: - Main Content Flow Controller
 struct ContentView: View {
     @StateObject private var appState = AppState.shared
@@ -137,15 +153,31 @@ struct ProfileView: View {
                                     .scaledToFill()
                                     .frame(width: 120, height: 120)
                                     .clipShape(Circle())
+                                    .task {
+                                        appState.updateUserAvatar(image)
+                                    }
+                            } else if let avatarUrl = appState.currentUser?.avatarUrl,
+                                      let url = URL(string: avatarUrl), let user = appState.currentUser {
+                                // Display existing avatar from URL
+                                AsyncImage(url: url) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 120, height: 120)
+                                            .clipShape(Circle())
+                                    case .failure(_), .empty:
+                                        // Fallback to default avatar if loading fails
+                                        defaultMemberAvatar(for: user)
+                                    @unknown default:
+                                        defaultMemberAvatar(for: user)
+                                    }
+                                }
                             } else {
-                                Circle()
-                                    .fill(Color.blue.opacity(0.3))
-                                    .frame(width: 120, height: 120)
-                                    .overlay(
-                                        Text(appState.currentUser?.username.prefix(1).uppercased() ?? "?")
-                                            .font(.system(size: 48, weight: .bold))
-                                            .foregroundColor(.white)
-                                    )
+                                // Default avatar with initial
+                                let user = appState.currentUser
+                                defaultMemberAvatar(for: user!)
                             }
                             
                             // Camera button overlay
@@ -246,40 +278,40 @@ struct ProfileView: View {
                     
                     Spacer()
                     
-                    // Action Buttons
-                    VStack(spacing: 12) {
-                        Button(action: {
-                            appState.currentState = .dashboard
-                        }) {
-                            Text("Back to Dashboard")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
-                        }
-                        .padding(.horizontal)
-                        
-                        Button(action: {
-                            Task { try await appState.signOut() }
-                        }) {
-                            Text("Sign Out")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.red.opacity(0.8))
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
-                        }
-                        .padding(.horizontal)
+                    // Sign Out Button
+                    Button(action: {
+                        Task { try await appState.signOut() }
+                    }) {
+                        Text("Sign Out")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.red.opacity(0.8))
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
                     }
+                    .padding(.horizontal)
                     .padding(.bottom, 20)
                 }
             }
             .background(Color.black.ignoresSafeArea())
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(true)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        appState.currentState = .dashboard
+                    }) {
+                        HStack(spacing: 4) {
+                            Text("Dashboard")
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        .foregroundColor(.blue)
+                    }
+                }
+            }
             .onAppear {
                 username = appState.currentUser?.username ?? ""
             }
@@ -436,9 +468,9 @@ struct DashboardView: View {
             .sheet(isPresented: $showCreateCollageSheet) {
                 CreateCollageSheet()
             }
-//            .refreshable {
-//                await appState.refreshActiveSessions()
-//            }
+            .refreshable {
+                await appState.refreshActiveSessions()
+            }
         }
     }
 }
@@ -518,70 +550,73 @@ struct CollagePreviewCard: View {
     let session: CollageSession
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Collage Preview Image
-            ZStack {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .aspectRatio(1, contentMode: .fit)
-                    .cornerRadius(12)
-                
-                if session.photos.isEmpty {
-                    VStack {
-                        Image(systemName: "photo.stack")
-                            .font(.system(size: 40))
-                            .foregroundColor(.gray)
-                        Text("No photos yet")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                } else {
-                    // Display photo thumbnails
-                    AsyncImage(url: URL(string: session.photos.first?.imageUrl ?? "")) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Color.gray.opacity(0.3)
-                    }
-                    .clipped()
-                    .cornerRadius(12)
+        NavigationLink(destination: CollageDetailView(session: session)) {
+            VStack(alignment: .leading, spacing: 8) {
+                // Collage Preview Image
+                ZStack {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .aspectRatio(1, contentMode: .fit)
+                        .cornerRadius(12)
                     
-                    if session.photos.count > 1 {
+                    if session.photos.isEmpty {
                         VStack {
-                            Spacer()
-                            HStack {
+                            Image(systemName: "photo.stack")
+                                .font(.system(size: 40))
+                                .foregroundColor(.gray)
+                            Text("No photos yet")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    } else {
+                        // Display photo thumbnails
+                        AsyncImage(url: URL(string: session.photos.first?.imageUrl ?? "")) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Color.gray.opacity(0.3)
+                        }
+                        .clipped()
+                        .cornerRadius(12)
+                        
+                        if session.photos.count > 1 {
+                            VStack {
                                 Spacer()
-                                Text("+\(session.photos.count - 1)")
-                                    .font(.caption.bold())
-                                    .foregroundColor(.white)
-                                    .padding(8)
-                                    .background(Color.black.opacity(0.7))
-                                    .cornerRadius(8)
-                                    .padding(8)
+                                HStack {
+                                    Spacer()
+                                    Text("+\(session.photos.count - 1)")
+                                        .font(.caption.bold())
+                                        .foregroundColor(.white)
+                                        .padding(8)
+                                        .background(Color.black.opacity(0.7))
+                                        .cornerRadius(8)
+                                        .padding(8)
+                                }
                             }
                         }
                     }
                 }
+                
+                // Theme
+                Text(session.collage.theme)
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                
+                // Time remaining
+                Text(timeRemainingText)
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                
+                // Members preview
+                MembersPreview(members: session.members)
             }
-            
-            // Theme
-            Text(session.collage.theme)
-                .font(.headline)
-                .foregroundColor(.white)
-                .lineLimit(1)
-            
-            // Time remaining
-            Text(timeRemainingText)
-                .font(.caption)
-                .foregroundColor(.gray)
-            
-            // Members preview
-            MembersPreview(members: session.members)
+            .padding()
+            .background(Color.gray.opacity(0.2))
+            .cornerRadius(16)
         }
-        .padding()
-        .background(Color.gray.opacity(0.2))
-        .cornerRadius(16)
+        .buttonStyle(PlainButtonStyle())
     }
     
     var timeRemainingText: String {
@@ -601,6 +636,237 @@ struct CollagePreviewCard: View {
     }
 }
 
+//MARK: - Collage Detail View
+struct CollageDetailView: View {
+    let session: CollageSession
+    @State private var showMembersList = false
+    @State private var showCopiedAlert = false
+    
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header
+                VStack(spacing: 12) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(session.collage.theme)
+                                .font(.title2.bold())
+                                .foregroundColor(.white)
+                            
+                            Text(timeRemainingText)
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Spacer()
+                        
+                        // Share code button
+                        Button(action: {
+                            UIPasteboard.general.string = session.inviteCode
+                            showCopiedAlert = true
+                            
+                            // Hide alert after 2 seconds
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                showCopiedAlert = false
+                            }
+                        }) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "square.on.square")
+                                    .font(.system(size: 20))
+                                Text(session.inviteCode)
+                                    .font(.caption.bold())
+                            }
+                            .foregroundColor(.blue)
+                            .padding(8)
+                            .background(Color.blue.opacity(0.2))
+                            .cornerRadius(8)
+                        }
+                        
+                        // Members preview button
+                        Button(action: {
+                            showMembersList = true
+                        }) {
+                            HStack(spacing: -8) {
+                                ForEach(session.members.prefix(3)) { member in
+                                    defaultMemberAvatar(for: member)
+                                }
+                                
+                                if session.members.count > 3 {
+                                    Circle()
+                                        .fill(Color.gray.opacity(0.7))
+                                        .frame(width: 35, height: 35)
+                                        .overlay(
+                                            Text("+\(session.members.count - 3)")
+                                                .font(.caption.bold())
+                                                .foregroundColor(.white)
+                                        )
+                                        .overlay(
+                                            Circle()
+                                                .stroke(Color.black, lineWidth: 2)
+                                        )
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                }
+                .padding(.bottom, 12)
+                
+                // Canvas Area
+                ZStack {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.1))
+                        .cornerRadius(12)
+                    
+                    if session.photos.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: "photo.stack")
+                                .font(.system(size: 60))
+                                .foregroundColor(.gray)
+                            Text("No photos yet")
+                                .font(.title3)
+                                .foregroundColor(.gray)
+                            Text("Tap the button below to add your first photo")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.center)
+                        }
+                    } else {
+                        // TODO: Implement photo display on canvas
+                        Text("Canvas with photos")
+                            .foregroundColor(.gray)
+                    }
+                }
+                .padding(.horizontal)
+                
+                // Bottom Button
+                Button(action: {
+                    // TODO: Implement add image
+                }) {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title2)
+                        Text("Add Image")
+                            .font(.headline)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(12)
+                }
+                .padding()
+            }
+            
+            // Copied alert
+            if showCopiedAlert {
+                VStack {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Invite code copied!")
+                            .font(.subheadline.bold())
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.9))
+                    .cornerRadius(12)
+                    .padding(.top, 50)
+                    
+                    Spacer()
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.spring(), value: showCopiedAlert)
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showMembersList) {
+            MembersListView(members: session.members)
+        }
+    }
+    
+    private var timeRemainingText: String {
+        let remaining = session.collage.expiresAt.timeIntervalSinceNow
+        if remaining <= 0 {
+            return "Expired"
+        }
+        
+        let hours = Int(remaining) / 3600
+        let minutes = (Int(remaining) % 3600) / 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m remaining"
+        } else {
+            return "\(minutes)m remaining"
+        }
+    }
+}
+
+//MARK: - Members List View
+struct MembersListView: View {
+    let members: [CollageUser]
+    @Environment(\.dismiss) var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                ScrollView {
+                    VStack(spacing: 16) {
+                        ForEach(members) { member in
+                            HStack(spacing: 12) {
+                                // Avatar
+                                if let avatarUrl = member.avatarUrl, let url = URL(string: avatarUrl) {
+                                    AsyncImage(url: url) { phase in
+                                        switch phase {
+                                        case .success(let image):
+                                            image
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: 50, height: 50)
+                                                .clipShape(Circle())
+                                        case .failure(_), .empty:
+                                            defaultMemberAvatar(for: member)
+                                        @unknown default:
+                                            defaultMemberAvatar(for: member)
+                                        }
+                                    }
+                                } else {
+                                    defaultMemberAvatar(for: member)
+                                }
+                                
+                                // Username
+                                Text(member.username)
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                
+                                Spacer()
+                            }
+                            .padding()
+                            .background(Color.gray.opacity(0.2))
+                            .cornerRadius(12)
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Members (\(members.count))")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(.blue)
+                }
+            }
+        }
+    }
+}
+
 //MARK: - Members Preview
 struct MembersPreview: View {
     let members: [CollageUser]
@@ -609,18 +875,7 @@ struct MembersPreview: View {
     var body: some View {
         HStack(spacing: -8) {
             ForEach(members.prefix(maxDisplay)) { member in
-                Circle()
-                    .fill(Color.blue.opacity(0.7))
-                    .frame(width: 30, height: 30)
-                    .overlay(
-                        Text(member.username.prefix(1).uppercased())
-                            .font(.caption.bold())
-                            .foregroundColor(.white)
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(Color.black, lineWidth: 2)
-                    )
+                memberAvatarView(for: member)
             }
             
             if members.count > maxDisplay {
@@ -644,6 +899,32 @@ struct MembersPreview: View {
                 .font(.caption)
                 .foregroundColor(.gray)
                 .padding(.leading, 4)
+        }
+    }
+    
+    @ViewBuilder
+    private func memberAvatarView(for member: CollageUser) -> some View {
+        if let avatarUrl = member.avatarUrl, let url = URL(string: avatarUrl) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 30, height: 30)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black, lineWidth: 2)
+                        )
+                case .failure(_), .empty:
+                    defaultMemberAvatar(for: member)
+                @unknown default:
+                    defaultMemberAvatar(for: member)
+                }
+            }
+        } else {
+            defaultMemberAvatar(for: member)
         }
     }
 }

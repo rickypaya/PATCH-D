@@ -121,6 +121,46 @@ class CollageDBManager {
         )
     }
     
+    //MARK: - Avatar Functions
+
+    func uploadUserAvatar(userId: UUID, image: UIImage) async throws -> String {
+        // Compress image to JPEG data
+        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
+            throw NSError(domain: "DB", code: 400, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"])
+        }
+        
+        // Generate unique filename
+        let filename = "\(userId.uuidString)_\(Date().timeIntervalSince1970).jpg"
+        let filePath = "avatars/\(filename)"
+        // Upload to Supabase storage
+        try await supabase.storage
+            .from("avatar-photos")
+            .upload(path: filePath, file: imageData, options: FileOptions(contentType: "image/jpeg"))
+        // Get public URL
+        let publicURL = try supabase.storage
+            .from("avatar-photos")
+            .getPublicURL(path: filePath)
+        
+        // Update user table with avatar URL
+        struct AvatarUpdate: Encodable {
+            let avatar_url: String
+            let updated_at: String
+        }
+        
+        let updateData = AvatarUpdate(
+            avatar_url: publicURL.absoluteString,
+            updated_at: ISO8601DateFormatter().string(from: Date())
+        )
+        
+        try await supabase
+            .from("users")
+            .update(updateData)
+            .eq("id", value: userId.uuidString)
+            .execute()
+        
+        return publicURL.absoluteString
+    }
+    
     func joinCollage(collageId: UUID) async throws {
         // Get current user
         let user = try await SupabaseManager.shared.getCurrentUser()
@@ -199,33 +239,32 @@ class CollageDBManager {
         // Fetch members
         let members = try await fetchCollageMembers(collageId: collageId)
         
-        // Fetch photos
-        let photos = try await fetchCollagePhotos(collageId: collageId)
+        //TODO: Fetch Photos
+        
         
         return CollageSession(
             id: collage.id,
             collage: collage,
             creator: creator,
             members: members,
-            photos: photos
+            photos: []
         )
     }
     
     func fetchSessions() async throws -> [CollageSession] {
         // Fetch collage IDs where user is a member
         let user = try await SupabaseManager.shared.getCurrentUser()
-        let userId = user.id
-        print("In fetch session for \(userId)")
+        print("In fetch session for \(user.id)")
         
         let memberships: [CollageMember] = try await supabase
             .from("collage_members")
             .select()
-            .eq("user_id", value: userId)
+            .eq("user_id", value: user.id)
             .execute()
             .value
         
         guard !memberships.isEmpty else {
-            print ("No memberships found for user: \(userId)")
+            print ("No memberships found for user: \(user.id)")
             return []
         }
         
@@ -258,134 +297,6 @@ class CollageDBManager {
         }
         
         return sessions
-    }
-    
-    //MARK: - Photo Functions
-    
-    func uploadPhoto(collageId: UUID, image: UIImage, position: CGPoint, size: CGSize, rotation: CGFloat) async throws -> Photo {
-        // Get current user
-        let user = try await SupabaseManager.shared.getCurrentUser()
-        let userProfile = try await fetchUser(userId: user.id)
-        
-        // Compress image to JPEG
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            throw NSError(domain: "Image", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to compress image"])
-        }
-        
-        // Generate unique filename
-        let filename = "\(collageId.uuidString)/\(UUID().uuidString).jpg"
-        let storageKey = filename
-        
-        // Upload to Supabase Storage
-        let uploadResponse = try await supabase.storage
-            .from("collage-photos")
-            .upload(storageKey, data: imageData, options: FileOptions(contentType: "image/jpeg"))
-        
-        // Get public URL
-        let publicURL = try supabase.storage
-            .from("collage-photos")
-            .getPublicURL(path: storageKey)
-        
-        // Calculate aspect ratio
-        let aspectRatio = image.size.width / image.size.height
-        
-        // Insert photo record
-        struct PhotoInsert: Encodable {
-            let collage_id: String
-            let user_id: String
-            let username: String
-            let storage_key: String
-            let image_url: String
-            let position_x: Double
-            let position_y: Double
-            let width: Double
-            let height: Double
-            let rotation: Double
-            let aspect_ratio: Double
-        }
-        
-        let photoData = PhotoInsert(
-            collage_id: collageId.uuidString,
-            user_id: user.id.uuidString,
-            username: userProfile.username,
-            storage_key: storageKey,
-            image_url: publicURL.absoluteString,
-            position_x: Double(position.x),
-            position_y: Double(position.y),
-            width: Double(size.width),
-            height: Double(size.height),
-            rotation: Double(rotation),
-            aspect_ratio: Double(aspectRatio)
-        )
-        
-        let photo: Photo = try await supabase
-            .from("photos")
-            .insert(photoData)
-            .select()
-            .single()
-            .execute()
-            .value
-        
-        return photo
-    }
-    
-    func fetchCollagePhotos(collageId: UUID) async throws -> [Photo] {
-        let photos: [Photo] = try await supabase
-            .from("photos")
-            .select()
-            .eq("collage_id", value: collageId.uuidString)
-            .order("uploaded_at", ascending: true)
-            .execute()
-            .value
-        
-        return photos
-    }
-    
-    func deletePhoto(photoId: UUID) async throws {
-        // Fetch photo to get storage key
-        let photo: Photo = try await supabase
-            .from("photos")
-            .select()
-            .eq("id", value: photoId.uuidString)
-            .single()
-            .execute()
-            .value
-        
-        // Delete from storage
-        try await supabase.storage
-            .from("collage-photos")
-            .remove(paths: [photo.storageKey])
-        
-        // Delete record from database
-        try await supabase
-            .from("photos")
-            .delete()
-            .eq("id", value: photoId.uuidString)
-            .execute()
-    }
-    
-    func updatePhotoPosition(photoId: UUID, position: CGPoint, size: CGSize, rotation: CGFloat) async throws {
-        struct PhotoUpdate: Encodable {
-            let position_x: Double
-            let position_y: Double
-            let width: Double
-            let height: Double
-            let rotation: Double
-        }
-        
-        let updateData = PhotoUpdate(
-            position_x: Double(position.x),
-            position_y: Double(position.y),
-            width: Double(size.width),
-            height: Double(size.height),
-            rotation: Double(rotation)
-        )
-        
-        try await supabase
-            .from("photos")
-            .update(updateData)
-            .eq("id", value: photoId.uuidString)
-            .execute()
     }
     
     //MARK: - User Functions

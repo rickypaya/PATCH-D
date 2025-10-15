@@ -122,7 +122,6 @@ class AppState: ObservableObject {
             
             //load active sessions
             await loadActiveSessions()
-            print(activeSessions)
             currentState = .dashboard
         }catch {
             errorMessage = error.localizedDescription
@@ -139,6 +138,7 @@ class AppState: ObservableObject {
         errorMessage = nil
         
         do {
+            currentState = .logIn
             try await supabase.signOut()
             
             //clear state
@@ -146,7 +146,6 @@ class AppState: ObservableObject {
             currentUser = nil
             currentUserId = nil
             activeSessions = []
-            currentState = .logIn
         }catch {
             errorMessage = error.localizedDescription
             throw error
@@ -208,5 +207,31 @@ class AppState: ObservableObject {
         return username.count >= 3 && username.count <= 30
     }
     
-    
+    //update user avatar
+    func updateUserAvatar(_ image: UIImage) {
+        guard let userId = currentUserId else {
+            errorMessage = "No user logged in"
+            return
+        }
+        
+        Task {
+            isLoading = true
+            errorMessage = nil
+            
+            do {
+                let avatarUrl = try await dbManager.uploadUserAvatar(userId: userId, image: image)
+                
+                // Refresh user profile to get updated avatar URL
+                try await refreshUserProfile()
+                
+                print("Avatar uploaded successfully: \(avatarUrl)")
+            } catch {
+                errorMessage = "Failed to upload avatar: \(error.localizedDescription)"
+                print(errorMessage ?? "")
+            }
+            
+            isLoading = false
+        }
+        
+    }
 }
