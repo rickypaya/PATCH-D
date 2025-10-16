@@ -155,9 +155,9 @@ class CollageDBManager {
     
     func updateCollagesessionsPreview(sessionId: UUID, imageURL: String) async throws {
         try await supabase
-            .from("collage_sessions")
+            .from("collages")
             .update([
-                "image_url": imageURL,
+                "preview_url": imageURL,
                 "updated_at": ISO8601DateFormatter().string(from: Date())
             ])
             .eq("id", value: sessionId.uuidString)
@@ -446,11 +446,66 @@ class CollageDBManager {
         
         // Fetch active collages
         let now = ISO8601DateFormatter().string(from: Date())
+        var collages: [Collage] = []
+        do {
+            collages = try await supabase
+                .from("collages")
+                .select()
+                .in("id", values: collageIds.map { $0.uuidString })
+                .gt("expires_at", value: now)
+                .execute()
+                .value
+            print(collages)
+            
+        }catch{
+            print("error fetching collages: \(error)")
+        }
+        
+        // Build CollageSession objects
+        var sessions: [CollageSession] = []
+        for collage in collages {
+            do {
+                let session = try await fetchCollage(collageId: collage.id)
+                sessions.append(session)
+            } catch {
+                print("Error fetching collage \(collage.id): \(error)")
+            }
+        }
+        
+        return sessions
+    }
+    
+    func fetchExpiredSession() async throws -> [CollageSession] {
+        // Fetch collage IDs where user is a member
+        let user = try await getCurrentUser()
+        print("In fetch session for \(user.id)")
+        
+        let memberships: [CollageMember] = try await supabase
+            .from("collage_members")
+            .select()
+            .eq("user_id", value: user.id)
+            .execute()
+            .value
+        
+        guard !memberships.isEmpty else {
+            print ("No memberships found for user: \(user.id)")
+            return []
+        }
+        
+        let collageIds = memberships.map { $0.collageId }
+        print("Found \(collageIds.count) memberships")
+        
+        guard !collageIds.isEmpty else {
+            return []
+        }
+        
+        // Fetch active collages
+        let now = ISO8601DateFormatter().string(from: Date())
         let collages: [Collage] = try await supabase
             .from("collages")
             .select()
             .in("id", values: collageIds.map { $0.uuidString })
-//            .gt("expires_at", value: now)
+            .lt("expires_at", value: now)
             .execute()
             .value
         

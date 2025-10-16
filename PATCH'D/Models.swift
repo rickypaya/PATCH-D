@@ -12,7 +12,7 @@ enum CurrState {
     case logIn
     case profile
     case dashboard
-//    case collage
+    case fullscreen
 }
 
 struct CollageUser: Identifiable, Codable {
@@ -60,7 +60,8 @@ struct Collage: Identifiable, Codable {
     var expiresAt: Date
     var createdAt: Date
     var updatedAt: Date
-    var backgroundUrl: String
+    var backgroundUrl: String?
+    var previewUrl: String?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -72,6 +73,7 @@ struct Collage: Identifiable, Codable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case backgroundUrl = "background_url"
+        case previewUrl = "preview_url"
     }
 }
 
@@ -93,21 +95,21 @@ struct CollageMember: Identifiable, Codable {
 
 struct CollagePhoto: Identifiable, Codable {
     var id: UUID
-    var collage_session_id: UUID
+    var collage_id: UUID
     var user_id: UUID
     var image_url: String
     let position_x: Double
     let position_y: Double
-    let roation: Double
+    let rotation: Double
     let scale: Double
     let created_at: Date
     let updated_at: Date
     
     enum CodingKeys: String, CodingKey {
-        case id, collage_session_id, user_id
-        case position_x, position_y, roation, scale
+        case id, collage_id, user_id
+        case position_x, position_y, rotation, scale
         case created_at, updated_at
-        case image_url = "imageUrl"
+        case image_url
     }
 
 }
@@ -122,7 +124,9 @@ struct CollageSession: Identifiable {
     var photos: [CollagePhoto]
     
     //Collage Previews
-    var imageUrl: String?
+    var preview_url: String? {
+        collage.previewUrl ?? ""
+    }
     var updated_at: Date?
     
     // Computed properties for convenience
@@ -143,7 +147,7 @@ struct CollageSession: Identifiable {
     }
     
     var backgroundUrl: String {
-        collage.backgroundUrl
+        collage.backgroundUrl ?? ""
     }
     
     var isActive: Bool {

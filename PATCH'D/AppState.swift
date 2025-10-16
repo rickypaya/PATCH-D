@@ -10,6 +10,7 @@ class AppState: ObservableObject {
     //async signOut() -> None
     //      clearError() -> None
     //updateUseravatar(image) -> None
+    //fetchRandomTheme() -> String
     
     
     static let shared = AppState()
@@ -23,7 +24,7 @@ class AppState: ObservableObject {
     @Published var collagePhotos: [CollagePhoto] = []
     @Published var isLoading = false //Is the app currently loading
     @Published var errorMessage: String? //error message if any present in app state
-    @Published var currentState: CurrState = .signUp //current app page
+    @Published var currentState: CurrState = .dashboard //current app page
     
     private var realTimeTask: Task <Void,Never>?
     
@@ -35,6 +36,7 @@ class AppState: ObservableObject {
         Task {
             await loadCurrentUser()
             await loadCollageSessions()
+            currentState = .dashboard
         }
     }
     
@@ -44,6 +46,7 @@ class AppState: ObservableObject {
             print(currentUser)
         } catch {
             errorMessage = "Failed to load user: \(error.localizedDescription)"
+            currentState = .signUp
         }
     }
     
@@ -156,13 +159,14 @@ class AppState: ObservableObject {
         selectedSession = session
         await loadPhotosForSelectedSession()
         startRealtimeSubscription()
+        currentState = .fullscreen
     }
     
     func deselectCollageSession(captureView: UIView?) async {
         if let session = selectedSession, let view = captureView {
             await captureAndUploadPreview(for: session, from: view)
         }
-        
+        currentState = .dashboard
         stopRealTimeSubscription()
         selectedSession = nil
         collagePhotos = []
@@ -236,8 +240,35 @@ class AppState: ObservableObject {
                 errorMessage = "Failed to add photo: \(error.localizedDescription)"
             }
         }
+    
+    func addPhotoFromImage(_ image: UIImage, at position: CGPoint, in viewSize: CGSize) async {
+        guard let session = selectedSession else { return }
         
-        func updatePhotoTransform(_ photo: CollagePhoto, position: CGPoint, rotation: Double, scale: Double, in viewSize: CGSize) async {
+        do {
+            // Upload the image
+            let imageUrl = try await dbManager.uploadCutoutImage(sessionId: session.id, image: image)
+            
+            // Calculate normalized position (0-1 range)
+            let normalizedX = Double(position.x / viewSize.width)
+            let normalizedY = Double(position.y / viewSize.height)
+            
+            // Add photo to database
+            let newPhoto = try await dbManager.addPhotoToCollage(
+                sessionId: session.id,
+                imageURL: imageUrl,
+                positionX: normalizedX,
+                positionY: normalizedY
+            )
+            
+            // Update local state
+            collagePhotos.append(newPhoto)
+        } catch {
+            errorMessage = "Failed to add photo: \(error.localizedDescription)"
+            print(errorMessage);
+        }
+    }
+        
+    func updatePhotoTransform(_ photo: CollagePhoto, position: CGPoint, rotation: Double, scale: Double, in viewSize: CGSize) async {
             // Calculate normalized position
             let normalizedX = Double(position.x / viewSize.width)
             let normalizedY = Double(position.y / viewSize.height)
@@ -255,12 +286,12 @@ class AppState: ObservableObject {
                 if let index = collagePhotos.firstIndex(where: { $0.id == photo.id }) {
                     collagePhotos[index] = CollagePhoto(
                         id: photo.id,
-                        collage_session_id: photo.collage_session_id,
+                        collage_id: photo.collage_id,
                         user_id: photo.user_id,
                         image_url: photo.image_url,
                         position_x: normalizedX,
                         position_y: normalizedY,
-                        roation: rotation,
+                        rotation: rotation,
                         scale: scale,
                         created_at: photo.created_at,
                         updated_at: Date()
@@ -270,6 +301,16 @@ class AppState: ObservableObject {
                 errorMessage = "Failed to update photo: \(error.localizedDescription)"
             }
         }
+    
+    func fetchRandomTheme() async throws -> String {
+        do {
+            let theme = try await dbManager.fetchRandomTheme()
+            return theme
+        } catch {
+            errorMessage = "Failed to fetch theme: \(error.localizedDescription)"
+            throw error
+        }
+    }
 
     
 //    //update user avatar

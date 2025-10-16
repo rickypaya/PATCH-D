@@ -1,0 +1,249 @@
+import SwiftUI
+import PhotosUI
+
+struct CollageFullscreenView: View {
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) var dismiss
+    
+    let session: CollageSession
+    
+    @State private var draggedPhotoId: UUID?
+    @State private var photoStates: [UUID: PhotoState] = [:]
+    @State private var showImageSourcePicker = false
+    @State private var showImagePicker = false
+    @State private var showCamera = false
+    @State private var selectedImage: UIImage?
+    @State private var canvasSize: CGSize = .zero
+    
+    struct PhotoState {
+        var offset: CGSize = .zero
+        var rotation: Angle = .zero
+        var scale: CGFloat = 1.0
+        var lastOffset: CGSize = .zero
+        var lastRotation: Angle = .zero
+        var lastScale: CGFloat = 1.0
+    }
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // Background - lighter color
+                Color.gray.opacity(0.2)
+                    .ignoresSafeArea()
+                
+                // Collage Canvas
+                ZStack {
+                    ForEach(appState.collagePhotos) { photo in
+                        CollagePhotoView(
+                            photo: photo,
+                            viewSize: geometry.size,
+                            state: photoStates[photo.id] ?? PhotoState(),
+                            onDragChanged: { value in
+                                handleDragChanged(photo: photo, value: value)
+                            },
+                            onDragEnded: { value in
+                                handleDragEnded(photo: photo, value: value, in: geometry.size)
+                            },
+                            onMagnifyChanged: { value in
+                                handleMagnifyChanged(photo: photo, value: value)
+                            },
+                            onMagnifyEnded: { value in
+                                handleMagnifyEnded(photo: photo, in: geometry.size)
+                            },
+                            onRotationChanged: { value in
+                                handleRotationChanged(photo: photo, value: value)
+                            },
+                            onRotationEnded: { value in
+                                handleRotationEnded(photo: photo, in: geometry.size)
+                            }
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onAppear {
+                    canvasSize = geometry.size
+                }
+                
+                // Top Bar with Close and Add buttons
+                VStack {
+                    HStack {
+                        // Close Button
+                        Button(action: {
+                            Task {
+                                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                   let window = windowScene.windows.first,
+                                   let rootView = window.rootViewController?.view {
+                                    await appState.deselectCollageSession(captureView: rootView)
+                                }
+                                dismiss()
+                            }
+                        }) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 40)
+                                .background(Color.black.opacity(0.6))
+                                .clipShape(Circle())
+                        }
+                        
+                        Spacer()
+                        
+                        // Add Photo Button
+                        Button(action: {
+                            showImageSourcePicker = true
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 40)
+                                .background(Color.blue.opacity(0.8))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .padding()
+                    
+                    Spacer()
+                }
+            }
+        }
+        .navigationBarHidden(true)
+        .onAppear {
+            initializePhotoStates()
+        }
+        .confirmationDialog("Add Photo", isPresented: $showImageSourcePicker) {
+            Button("Take Photo") {
+                showCamera = true
+            }
+            Button("Choose from Library") {
+                showImagePicker = true
+            }
+            Button("Cancel", role: .cancel) { }
+        }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(image: $selectedImage, sourceType: UIImagePickerController.SourceType.photoLibrary)
+        }
+        .sheet(isPresented: $showCamera) {
+            ImagePicker(image: $selectedImage, sourceType: UIImagePickerController.SourceType.camera)
+        }
+        .onChange(of: selectedImage) { oldValue, newValue in
+            if let image = newValue {
+                addPhotoToCanvas(image: image, in: canvasSize)
+            }
+        }
+    }
+    
+    // MARK: - Helpers
+    
+    private func initializePhotoStates() {
+        for photo in appState.collagePhotos {
+            if photoStates[photo.id] == nil {
+                photoStates[photo.id] = PhotoState(
+                    rotation: Angle(degrees: photo.rotation),
+                    scale: photo.scale,
+                    lastRotation: Angle(degrees: photo.rotation),
+                    lastScale: photo.scale
+                )
+            }
+        }
+    }
+    
+    private func addPhotoToCanvas(image: UIImage, in viewSize: CGSize) {
+        // Add photo at center of screen
+        let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
+        
+        Task {
+            await appState.addPhotoFromImage(image, at: centerPoint, in: viewSize)
+            selectedImage = nil // Reset after adding
+        }
+    }
+    
+    // MARK: - Gesture Handlers
+    
+    private func handleDragChanged(photo: CollagePhoto, value: DragGesture.Value) {
+        var state = photoStates[photo.id] ?? PhotoState()
+        state.offset = CGSize(
+            width: state.lastOffset.width + value.translation.width,
+            height: state.lastOffset.height + value.translation.height
+        )
+        photoStates[photo.id] = state
+    }
+    
+    private func handleDragEnded(photo: CollagePhoto, value: DragGesture.Value, in viewSize: CGSize) {
+        var state = photoStates[photo.id] ?? PhotoState()
+        state.lastOffset = state.offset
+        photoStates[photo.id] = state
+        
+        let position = calculateAbsolutePosition(photo: photo, state: state, in: viewSize)
+        
+        Task {
+            await appState.updatePhotoTransform(
+                photo,
+                position: position,
+                rotation: state.rotation.degrees,
+                scale: state.scale,
+                in: viewSize
+            )
+        }
+    }
+    
+    private func handleMagnifyChanged(photo: CollagePhoto, value: MagnificationGesture.Value) {
+        var state = photoStates[photo.id] ?? PhotoState()
+        state.scale = state.lastScale * value
+        photoStates[photo.id] = state
+    }
+    
+    private func handleMagnifyEnded(photo: CollagePhoto, in viewSize: CGSize) {
+        var state = photoStates[photo.id] ?? PhotoState()
+        state.lastScale = state.scale
+        photoStates[photo.id] = state
+        
+        let position = calculateAbsolutePosition(photo: photo, state: state, in: viewSize)
+        
+        Task {
+            await appState.updatePhotoTransform(
+                photo,
+                position: position,
+                rotation: state.rotation.degrees,
+                scale: state.scale,
+                in: viewSize
+            )
+        }
+    }
+    
+    private func handleRotationChanged(photo: CollagePhoto, value: RotationGesture.Value) {
+        var state = photoStates[photo.id] ?? PhotoState()
+        state.rotation = state.lastRotation + value
+        photoStates[photo.id] = state
+    }
+    
+    private func handleRotationEnded(photo: CollagePhoto, in viewSize: CGSize) {
+        var state = photoStates[photo.id] ?? PhotoState()
+        state.lastRotation = state.rotation
+        photoStates[photo.id] = state
+        
+        let position = calculateAbsolutePosition(photo: photo, state: state, in: viewSize)
+        
+        Task {
+            await appState.updatePhotoTransform(
+                photo,
+                position: position,
+                rotation: state.rotation.degrees,
+                scale: state.scale,
+                in: viewSize
+            )
+        }
+    }
+    
+    private func calculateAbsolutePosition(photo: CollagePhoto, state: PhotoState, in viewSize: CGSize) -> CGPoint {
+        let baseX = CGFloat(photo.position_x) * viewSize.width
+        let baseY = CGFloat(photo.position_y) * viewSize.height
+        
+        return CGPoint(
+            x: baseX + state.offset.width,
+            y: baseY + state.offset.height
+        )
+    }
+}
+
+

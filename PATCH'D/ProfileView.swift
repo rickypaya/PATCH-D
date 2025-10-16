@@ -13,6 +13,7 @@ struct ProfileView: View {
     @State private var isEditing = false
     @State private var isSaving = false
     @State private var showImagePicker = false
+    @State private var showCamera = false
     @State private var selectedImage: UIImage?
     @State private var errorMessage: String?
     @State private var successMessage: String?
@@ -192,9 +193,35 @@ struct ProfileView: View {
             .onAppear {
                 username = appState.currentUser?.username ?? ""
             }
-            .sheet(isPresented: $showImagePicker) {
-                ImagePicker(selectedImage: $selectedImage)
+            .confirmationDialog("Add Photo", isPresented: $showImagePicker) {
+                Button("Take Photo") {
+                    showCamera = true
+                }
+                Button("Choose from Library") {
+                    showImagePicker = true
+                }
+                Button("Cancel", role: .cancel) { }
             }
+            .sheet(isPresented: $showImagePicker) {
+                ImagePicker(image: $selectedImage, sourceType: UIImagePickerController.SourceType.photoLibrary)
+            }
+            .sheet(isPresented: $showCamera) {
+                ImagePicker(image: $selectedImage, sourceType: UIImagePickerController.SourceType.camera)
+            }
+//            .onChange(of: selectedImage) { oldValue, newValue in
+//                if let image = newValue {
+//                    addPhotoToCanvas(image: image, in: canvasSize)
+//                }
+//            }
+        }
+    }
+    private func addPhotoToCanvas(image: UIImage, in viewSize: CGSize) {
+        // Add photo at center of screen
+        let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
+        
+        Task {
+            await appState.addPhotoFromImage(image, at: centerPoint, in: viewSize)
+            selectedImage = nil // Reset after adding
         }
     }
     

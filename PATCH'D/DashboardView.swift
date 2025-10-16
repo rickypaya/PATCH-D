@@ -1,12 +1,6 @@
-//
-//  DashboardView.swift
-//  PATCH'D
-//
-//  Created by Ricardo Payares on 10/15/25.
-//
-
 import SwiftUI
-//MARK: - Dashboard View
+
+// MARK: - Dashboard View
 struct DashboardView: View {
     @EnvironmentObject var appState: AppState
     @State private var showInviteCodeSheet = false
@@ -21,7 +15,10 @@ struct DashboardView: View {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 } else if appState.collageSessions.isEmpty {
-                    EmptyStateView(showInviteCodeSheet: $showInviteCodeSheet, showCreateCollageSheet: $showCreateCollageSheet)
+                    EmptyStateView(
+                        showInviteCodeSheet: $showInviteCodeSheet,
+                        showCreateCollageSheet: $showCreateCollageSheet
+                    )
                 } else {
                     CollageGridView()
                 }
@@ -34,6 +31,7 @@ struct DashboardView: View {
                         appState.currentState = .profile
                     }) {
                         Image(systemName: "person.circle")
+                            .font(.title3)
                             .foregroundColor(.white)
                     }
                 }
@@ -53,6 +51,7 @@ struct DashboardView: View {
                         }
                     } label: {
                         Image(systemName: "plus.circle.fill")
+                            .font(.title3)
                             .foregroundColor(.white)
                     }
                 }
@@ -67,10 +66,15 @@ struct DashboardView: View {
                 await appState.loadCollageSessions()
             }
         }
+        .onAppear {
+            if appState.currentUser == nil {
+                appState.currentState = .signUp
+            }
+        }
     }
 }
 
-//MARK: - Empty State View
+// MARK: - Empty State View
 struct EmptyStateView: View {
     @Binding var showInviteCodeSheet: Bool
     @Binding var showCreateCollageSheet: Bool
@@ -119,7 +123,7 @@ struct EmptyStateView: View {
     }
 }
 
-//MARK: - Collage Grid View
+// MARK: - Collage Grid View
 struct CollageGridView: View {
     @EnvironmentObject var appState: AppState
     
@@ -140,7 +144,7 @@ struct CollageGridView: View {
     }
 }
 
-//MARK: - Collage Preview Card
+// MARK: - Collage Preview Card
 struct CollagePreviewCard: View {
     let session: CollageSession
     
@@ -148,64 +152,28 @@ struct CollagePreviewCard: View {
         NavigationLink(destination: CollageDetailView(session: session)) {
             VStack(alignment: .leading, spacing: 8) {
                 // Collage Preview Image
-                ZStack {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                        .aspectRatio(1, contentMode: .fit)
-                        .cornerRadius(12)
-                    
-                    if session.photos.isEmpty {
-                        VStack {
-                            Image(systemName: "photo.stack")
-                                .font(.system(size: 40))
-                                .foregroundColor(.gray)
-                            Text("No photos yet")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                    } else {
-                        // Display photo thumbnails
-//                        AsyncImage(url: URL(string: session.photos.first?.imageUrl ?? "")) { image in
-//                            image
-//                                .resizable()
-//                                .aspectRatio(contentMode: .fill)
-//                        } placeholder: {
-//                            Color.gray.opacity(0.3)
-//                        }
-//                        .clipped()
-//                        .cornerRadius(12)
-                        
-                        if session.photos.count > 1 {
-                            VStack {
-                                Spacer()
-                                HStack {
-                                    Spacer()
-                                    Text("+\(session.photos.count - 1)")
-                                        .font(.caption.bold())
-                                        .foregroundColor(.white)
-                                        .padding(8)
-                                        .background(Color.black.opacity(0.7))
-                                        .cornerRadius(8)
-                                        .padding(8)
-                                }
-                            }
-                        }
-                    }
-                }
+                previewImageView
                 
                 // Theme
-                Text(session.collage.theme)
+                Text(session.theme)
                     .font(.headline)
                     .foregroundColor(.white)
                     .lineLimit(1)
                 
-                // Time remaining
+                // Time Remaining
                 Text(timeRemainingText)
                     .font(.caption)
                     .foregroundColor(.gray)
                 
-                // Members preview
-                MembersPreview(members: session.members)
+                // Members Count
+                HStack(spacing: 4) {
+                    Image(systemName: "person.2.fill")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    Text("\(session.members.count)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
             }
             .padding()
             .background(Color.gray.opacity(0.2))
@@ -214,8 +182,66 @@ struct CollagePreviewCard: View {
         .buttonStyle(PlainButtonStyle())
     }
     
-    var timeRemainingText: String {
-        let remaining = session.collage.expiresAt.timeIntervalSinceNow
+    private var previewImageView: some View {
+            ZStack {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .aspectRatio(1, contentMode: .fit)
+                    .cornerRadius(12)
+                
+                if let previewUrl = session.preview_url, let url = URL(string: previewUrl) {
+                    // Display preview image if available
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .clipped()
+                                .cornerRadius(12)
+                        case .failure(_), .empty:
+                            emptyPreviewView
+                        @unknown default:
+                            emptyPreviewView
+                        }
+                    }
+                    
+                    // Photo count badge
+                    if !session.photos.isEmpty {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                Text("\(session.photos.count) photo\(session.photos.count == 1 ? "" : "s")")
+                                    .font(.caption.bold())
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                                    .background(Color.black.opacity(0.7))
+                                    .cornerRadius(8)
+                                    .padding(8)
+                            }
+                        }
+                    }
+                } else {
+                    emptyPreviewView
+                }
+            }
+        }
+        
+        private var emptyPreviewView: some View {
+            VStack(spacing: 8) {
+                Image(systemName: "photo.stack")
+                    .font(.system(size: 40))
+                    .foregroundColor(.gray)
+                Text("No photos yet")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+        }
+    
+    private var timeRemainingText: String {
+        let remaining = session.expiresAt.timeIntervalSinceNow
         if remaining <= 0 {
             return "Expired"
         }
@@ -231,10 +257,11 @@ struct CollagePreviewCard: View {
     }
 }
 
-//MARK: - Create Collage Sheet
+// MARK: - Create Collage Sheet
 struct CreateCollageSheet: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
+    
     @State private var isCreating = false
     @State private var selectedDuration: TimeInterval = 3600 // 1 hour default
     @State private var errorMessage: String?
@@ -262,6 +289,7 @@ struct CreateCollageSheet: View {
                     .font(.body)
                     .foregroundColor(.gray)
                 
+                // Duration Picker
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Duration")
                         .font(.headline)
@@ -310,13 +338,21 @@ struct CreateCollageSheet: View {
         }
     }
     
-    func createCollage() {
+    private func createCollage() {
         errorMessage = nil
         isCreating = true
         
         Task {
             do {
-                await appState.createNewCollageSession(duration: selectedDuration)
+                // Fetch random theme
+                let theme = try await appState.fetchRandomTheme()
+                
+                // Create collage with theme
+                await appState.createNewCollageSession(theme: theme, duration: selectedDuration)
+                
+                // Reload sessions
+                await appState.loadCollageSessions()
+                
                 dismiss()
             } catch {
                 errorMessage = error.localizedDescription

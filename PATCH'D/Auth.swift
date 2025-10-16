@@ -1,9 +1,4 @@
-//
-//  Auth.swift
-//  PATCH'D
-//
-//  Created by Ricardo Payares on 10/15/25.
-//
+
 import SwiftUI
 
 //MARK: - Login View

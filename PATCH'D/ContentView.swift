@@ -76,6 +76,8 @@ struct ContentView: View {
                 ProfileView()
             case .dashboard:
                 DashboardView()
+            case .fullscreen:
+                CollageFullscreenView(session: appState.selectedSession!)
             }
         }
         .environmentObject(appState)

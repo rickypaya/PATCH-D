@@ -2,21 +2,20 @@
 //  ImagePicker.swift
 //  PATCH'D
 //
-//  Created by Ricardo Payares on 10/15/25.
 //
-
+// MARK: - Image Picker
 import SwiftUI
 
-//MARK: - Image Picker
 struct ImagePicker: UIViewControllerRepresentable {
-    @Binding var selectedImage: UIImage?
+    @Binding var image: UIImage?
     @Environment(\.dismiss) var dismiss
+    
+    let sourceType: UIImagePickerController.SourceType
     
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
+        picker.sourceType = sourceType
         picker.delegate = context.coordinator
-        picker.allowsEditing = true
-        picker.sourceType = .photoLibrary
         return picker
     }
     
@@ -34,8 +33,8 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
         
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let image = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage {
-                parent.selectedImage = image
+            if let uiImage = info[.originalImage] as? UIImage {
+                parent.image = uiImage
             }
             parent.dismiss()
         }
