@@ -20,12 +20,14 @@ struct CollageUser: Identifiable, Codable {
     var email: String
     var username: String
     var avatarUrl: String?
+    var createdAt: Date
     
     enum CodingKeys: String, CodingKey {
         case id
         case email
         case username
         case avatarUrl = "avatar_url"
+        case createdAt = "created_at"
     }
 }
 
@@ -89,36 +91,25 @@ struct CollageMember: Identifiable, Codable {
 
 // MARK: - Photo Models
 
-struct Photo: Identifiable, Codable {
+struct CollagePhoto: Identifiable, Codable {
     var id: UUID
-    var collageId: UUID
-    var userId: UUID
-    var username: String
-    var storageKey: String
-    var imageUrl: String
-    var positionX: CGFloat
-    var positionY: CGFloat
-    var width: CGFloat
-    var height: CGFloat
-    var rotation: CGFloat
-    var aspectRatio: CGFloat
-    var uploadedAt: Date
+    var collage_session_id: UUID
+    var user_id: UUID
+    var image_url: String
+    let position_x: Double
+    let position_y: Double
+    let roation: Double
+    let scale: Double
+    let created_at: Date
+    let updated_at: Date
     
     enum CodingKeys: String, CodingKey {
-        case id
-        case collageId = "collage_id"
-        case userId = "user_id"
-        case username
-        case storageKey = "storage_key"
-        case imageUrl = "image_url"
-        case positionX = "position_x"
-        case positionY = "position_y"
-        case width
-        case height
-        case rotation
-        case aspectRatio = "aspect_ratio"
-        case uploadedAt = "uploaded_at"
+        case id, collage_session_id, user_id
+        case position_x, position_y, roation, scale
+        case created_at, updated_at
+        case image_url = "imageUrl"
     }
+
 }
 
 // MARK: - Composite Models (for UI convenience)
@@ -128,7 +119,11 @@ struct CollageSession: Identifiable {
     var collage: Collage
     var creator: CollageUser
     var members: [CollageUser]
-    var photos: [Photo]
+    var photos: [CollagePhoto]
+    
+    //Collage Previews
+    var imageUrl: String?
+    var updated_at: Date?
     
     // Computed properties for convenience
     var theme: String {

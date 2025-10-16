@@ -5,47 +5,75 @@
 import SwiftUI
 import Supabase
 
-//MARK: - Supabase Manager
+//MARK: - Collage DB Manager
 
-class SupabaseManager {
-    static let shared = SupabaseManager()
-    let client: SupabaseClient
+class CollageDBManager {
+    //Handles supabase db table management
+    //Methods:
+    //async getCurrentuser() -> Collage User
+    //async SignUpWithEmail() -> AuthResponse
+    //async SignIn() -> Session
+    //async SignOut() -> None
+    //async fetchRandomTheme() -> String
+    //async createCollage(theme, duration) -> CollageSession
+    //async updateCollageSessionPreview(sessionId, imageUrl) -> None
+    //async fetchPhotosForSession(sessionId) -> [CollagePhoto]
+    //async addPhotoToCollage(sessionId, imageURL, positionX, positionY) -> CollagePhoto
+    //async updatePhotoTransform(photoId, positionX, positionY, rotation, scale) -> None
+    //async uploadImage(image, bucket, folder, filename) -> String(filepath)
+    //async uploadCollagePreview(sessionId, image) -> string (imageURL)
+    //asubscribeToPhotoUpdates(sessionid, onchange) -> Task
+    //async uploadUserAvatar(userId, image) -> String (filepath)
+    //async joinCollage(collageId) -> None
+    //async joinCollageByInviteCode(inviteCode) -> CollageSession
+    //async fetchCollage(collageId) -> CollageSession
+    //async fetchSessions() -> [CollageSession]
+    //async fetchUser(userId) -> CollageUser
+    //async fetchCollageMembers(collageId) -> [CollageUsers]
+    //async updateUserName(username) -> None
+    //private generateInviteColde() -> String
+    
+    
+    static let shared = CollageDBManager()
+    //supabase manager - private to CollageDBManager class
+    private let supabase: SupabaseClient
     
     private init() {
-        client = SupabaseClient(
+        supabase = SupabaseClient(
             //TODO: Hide Supabase Key with environment variables
             supabaseURL: URL(string: "https://bxrnvixgpktkuwqncafe.supabase.co")!,
             supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4cm52aXhncGt0a3V3cW5jYWZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODU3NzEsImV4cCI6MjA3NTQ2MTc3MX0.hgluiRmwCUruyXvDrEwzDhtZ4zA2QdmClAt8GupIJgs"
         )
     }
     
+    func getCurrentUser() async throws -> CollageUser {
+        let session = try await supabase.auth.session
+        let userId = session.user.id
+        
+        let response: CollageUser = try await supabase
+            .from("users")
+            .select()
+            .eq("id", value: userId.uuidString)
+            .single()
+            .execute()
+            .value
+        
+        return response
+    }
+    
     func signUpWithEmail(email: String, password: String) async throws -> AuthResponse {
-        let authResp = try await client.auth.signUp(email: email, password: password)
+        let authResp = try await supabase.auth.signUp(email: email, password: password)
         return authResp
     }
     
     func signIn(email: String, password: String) async throws -> Session {
-        let authResp = try await client.auth.signIn(email: email, password: password)
+        let authResp = try await supabase.auth.signIn(email: email, password: password)
         return authResp
     }
     
     func signOut() async throws {
-        try await client.auth.signOut()
+        try await supabase.auth.signOut()
     }
-    
-    func getCurrentUser() async throws -> User {
-        let session = try await client.auth.session
-        return session.user
-    }
-}
-
-//MARK: - Collage DB Manager
-
-class CollageDBManager {
-    static let shared = CollageDBManager()
-    private let supabase = SupabaseManager.shared.client
-    
-    private init() {}
     
     //MARK: - Theme Functions
     
@@ -69,7 +97,7 @@ class CollageDBManager {
     
     func createCollage(theme: String, duration: TimeInterval) async throws -> CollageSession {
         // Get current user
-        let user = try await SupabaseManager.shared.getCurrentUser()
+        let user = try await getCurrentUser()
         
         // Generate unique 8-character invite code
         let inviteCode = generateInviteCode()
@@ -85,6 +113,7 @@ class CollageDBManager {
             let invite_code: String
             let starts_at: String
             let expires_at: String
+            let updated_at: String
             let background_url: String
         }
         
@@ -94,6 +123,7 @@ class CollageDBManager {
             invite_code: inviteCode,
             starts_at: ISO8601DateFormatter().string(from: now),
             expires_at: ISO8601DateFormatter().string(from: expiresAt),
+            updated_at: ISO8601DateFormatter().string(from: now),
             background_url: "" // You may want to generate/select a background
         )
         
@@ -111,14 +141,151 @@ class CollageDBManager {
         // Fetch the user profile
         let creator = try await fetchUser(userId: user.id)
         
+        let members = try await fetchCollageMembers(collageId: collage.id)
+        
         // Return CollageSession
         return CollageSession(
             id: collage.id,
             collage: collage,
             creator: creator,
-            members: [creator],
+            members: members,
             photos: []
         )
+    }
+    
+    func updateCollagesessionsPreview(sessionId: UUID, imageURL: String) async throws {
+        try await supabase
+            .from("collage_sessions")
+            .update([
+                "image_url": imageURL,
+                "updated_at": ISO8601DateFormatter().string(from: Date())
+            ])
+            .eq("id", value: sessionId.uuidString)
+            .execute()
+    }
+    
+    func fetchPhotosForSession(sessionId: UUID) async throws -> [CollagePhoto] {
+        let response: [CollagePhoto] = try await supabase
+            .from("photos")
+            .select()
+            .eq("collage_id", value: sessionId.uuidString)
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+        
+        return response
+    }
+    
+    func addPhotoToCollage(sessionId: UUID, imageURL: String, positionX: Double, positionY: Double ) async throws -> CollagePhoto {
+        let user = try await getCurrentUser()
+        
+        struct collagePhotoInsert : Encodable {
+            let collage_id: UUID
+            let user_id: UUID
+            let image_url: String
+            let position_x: Double
+            let position_y: Double
+            let rotation: Double
+            let scale: Double
+            let updated_at: String
+            let created_at: String
+        }
+        
+        let newPhoto = collagePhotoInsert(
+            collage_id: sessionId,
+            user_id: user.id,
+            image_url: imageURL,
+            position_x: positionX,
+            position_y: positionY,
+            rotation: 0.0,
+            scale: 1.0,
+            updated_at: ISO8601DateFormatter().string(from: Date()),
+            created_at: ISO8601DateFormatter().string(from: Date())
+        )
+        
+        let response : CollagePhoto = try await supabase
+            .from("photos")
+            .insert(newPhoto)
+            .select()
+            .single()
+            .execute()
+            .value
+        
+        return response
+    }
+    
+    func updatePhotoTransform (photoId: UUID, positionX: Double, positionY: Double, rotation: Double, scale: Double) async throws {
+        try await supabase
+            .from("photos")
+            .update([
+                "position_x": positionX,
+                "position_y": positionY,
+                "rotation": rotation,
+                "scale": scale
+            ])
+            .eq("id", value: photoId)
+            .execute()
+    }
+    
+    func uploadImage(_ image: UIImage, bucket: String, folder: String, fileName: String) async throws -> String {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            throw NSError(domain: "DBManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"])
+        }
+        
+        let filePath = "\(folder)/\(fileName)"
+        
+        try await supabase.storage
+            .from(bucket)
+            .upload(path: filePath, file: imageData, options: FileOptions(contentType: "image/png", upsert: true))
+        
+        let publicURL = try supabase.storage
+            .from(bucket)
+            .getPublicURL(path: filePath)
+        
+        return publicURL.absoluteString
+        
+    }
+    
+    func uploadCollagePreview(sessionId: UUID, image: UIImage) async throws -> String {
+        let fileName = "\(sessionId.uuidString).png"
+        let imageUrl = try await uploadImage(image, bucket: "patchd-storage", folder: "collage-previews", fileName: fileName)
+        
+        try await updateCollagesessionsPreview(sessionId: sessionId, imageURL: imageUrl)
+        
+        return imageUrl
+    }
+    
+    //MARK: - Realtime subscriptions
+    func subscribeToPhotoUpdates(sessionId: UUID, onChange: @escaping ([CollagePhoto]) -> Void) -> Task <Void, Never> {
+        
+        return Task {
+            var channel = supabase.channel("photos")
+                  
+            let changes = channel.postgresChange(
+                AnyAction.self,
+                schema: "public",
+                table: "photos",
+                filter: .eq("collage_id", value: "\(sessionId.uuidString)")
+            )
+            
+            await channel.subscribe()
+            
+            for await _ in changes {
+                do {
+                    let photos = try await self.fetchPhotosForSession(sessionId: sessionId)
+                    onChange(photos)
+                } catch {
+                    print("Error fetching updated photos: \(error)")
+                }
+            }
+                
+        }
+    }
+    
+    func uploadCutoutImage(sessionId: UUID, image: UIImage) async throws -> String {
+        let fileName = "\(UUID().uuidString).png"
+        return try await uploadImage(image, bucket: "patchd-storage", folder: "collage-photos", fileName: fileName)
+
     }
     
     //MARK: - Avatar Functions
@@ -134,11 +301,11 @@ class CollageDBManager {
         let filePath = "avatars/\(filename)"
         // Upload to Supabase storage
         try await supabase.storage
-            .from("avatar-photos")
+            .from("patchd-storage")
             .upload(path: filePath, file: imageData, options: FileOptions(contentType: "image/jpeg"))
         // Get public URL
         let publicURL = try supabase.storage
-            .from("avatar-photos")
+            .from("patchd-storage")
             .getPublicURL(path: filePath)
         
         // Update user table with avatar URL
@@ -161,9 +328,11 @@ class CollageDBManager {
         return publicURL.absoluteString
     }
     
+    
+    
     func joinCollage(collageId: UUID) async throws {
         // Get current user
-        let user = try await SupabaseManager.shared.getCurrentUser()
+        let user = try await getCurrentUser()
         
         // Check if already a member
         let existingMembers: [CollageMember] = try await supabase
@@ -240,20 +409,20 @@ class CollageDBManager {
         let members = try await fetchCollageMembers(collageId: collageId)
         
         //TODO: Fetch Photos
-        
+        let photos = try await fetchPhotosForSession(sessionId: collageId)
         
         return CollageSession(
             id: collage.id,
             collage: collage,
             creator: creator,
             members: members,
-            photos: []
+            photos: photos
         )
     }
     
     func fetchSessions() async throws -> [CollageSession] {
         // Fetch collage IDs where user is a member
-        let user = try await SupabaseManager.shared.getCurrentUser()
+        let user = try await getCurrentUser()
         print("In fetch session for \(user.id)")
         
         let memberships: [CollageMember] = try await supabase
@@ -341,7 +510,7 @@ class CollageDBManager {
     
     func updateUsername(username: String) async throws {
             // Get current user
-            let user = try await SupabaseManager.shared.getCurrentUser()
+            let user = try await getCurrentUser()
             
             struct UsernameUpdate: Encodable {
                 let username: String
@@ -366,4 +535,5 @@ class CollageDBManager {
         let characters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // Excluding similar looking characters
         return String((0..<8).map { _ in characters.randomElement()! })
     }
+    
 }
