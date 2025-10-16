@@ -1,5 +1,18 @@
 # PATCH'D - Project Division
 
+## Oct 14th Meeting Tasks
+- [ ] realtime dashboard - med
+- [ ] implement collaging - Camera/Library add, paste from photos app, add stickers from library - high
+- [ ] populate stickers bucket, add stickers library to collage - high
+- [ ] photo gestures (moving, scaling, rotating) - high
+- [ ] realtime countdown - low
+- [ ] Auto auth, remember me, reset password, confirm email - med
+- [ ] Archive view (Expired collages) - med
+- [ ] finished collage view (save, share button) - med
+
+### Hail Mary
+- [ ] Homescreen widget with Archived Collages (?)
+      
 
 ### File 1: **Models.swift**
 **Purpose:** All data models and structures for the application
