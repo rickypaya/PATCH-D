@@ -7,6 +7,8 @@ struct CollageDetailView: View {
     
     @State private var showMembersList = false
     @State private var showCopiedAlert = false
+    @State private var timer: Timer?
+    @State private var timeRemaining: TimeInterval = 0
     
     var body: some View {
         ZStack {
@@ -37,6 +39,12 @@ struct CollageDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showMembersList) {
             MembersListView(members: session.members)
+        }
+        .onAppear {
+            startCountdownTimer()
+        }
+        .onDisappear {
+            stopCountdownTimer()
         }
         
     }
@@ -154,6 +162,27 @@ struct CollageDetailView: View {
         }
     }
     
+    // MARK: - Timer Management
+    private func startCountdownTimer() {
+        // Initialize time remaining
+        timeRemaining = session.expiresAt.timeIntervalSinceNow
+        
+        // Start timer that updates every second
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            timeRemaining = session.expiresAt.timeIntervalSinceNow
+            
+            // Stop timer if expired
+            if timeRemaining <= 0 {
+                stopCountdownTimer()
+            }
+        }
+    }
+    
+    private func stopCountdownTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+    
     @ViewBuilder
     private func memberAvatarView(for member: CollageUser) -> some View {
         if let avatarUrl = member.avatarUrl, let url = URL(string: avatarUrl) {
@@ -190,19 +219,15 @@ struct CollageDetailView: View {
     }
     
     private var timeRemainingText: String {
-        let remaining = session.expiresAt.timeIntervalSinceNow
-        if remaining <= 0 {
+        if timeRemaining <= 0 {
             return "Expired"
         }
         
-        let hours = Int(remaining) / 3600
-        let minutes = (Int(remaining) % 3600) / 60
+        let hours = Int(timeRemaining) / 3600
+        let minutes = (Int(timeRemaining) % 3600) / 60
+        let seconds = Int(timeRemaining) % 60
         
-        if hours > 0 {
-            return "\(hours)h \(minutes)m remaining"
-        } else {
-            return "\(minutes)m remaining"
-        }
+        return String(format: "%02d:%02d:%02d remaining", hours, minutes, seconds)
     }
     
     private var previewImageView: some View {
