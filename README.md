@@ -1,3 +1,46 @@
+# PATCH'D  - Overview
+Patched is a real-time collaborative photo and media collaging application made for iPhone
+With an email login, a user can easily begin creating and sharing collages with friends to join in on the fun.
+Collages can be made from photos taken with the camera, from the library, or cutouts from photos
+
+Goals:
+- Real-time, intuitive photo collaging features that encourage users to take more photos and use copy photo cutouts.
+- Social Features for users to easily invite friends and share collages with recent favorites
+- Robust mobile application and attractive design
+
+MVP 1 - 10/16 Beta
+- Prototype application and database setup
+Features:
+- signup, logging in
+- dashboard
+   - create new collage
+  - join collage with invite code
+- User profile
+  - avatar image upload
+  - sign out
+- Collage Detail View
+  - Users list (not real time)
+  - Countdown timer (realtime)
+  - Collage Preview
+  - Launch Fullscreen
+- Full Screen View
+- - Exit button (Updates collage preview)
+  - Collage Photos (realtime)
+  - Drag (WIP) - Move
+  - Pinch - Scale
+  - Rotate - scale (NF)
+ 
+MVP 2 Goals: 
+- "Active Users" real-time data
+- Smooth collaging experience
+- App aesthetics, branding
+- Auth Notification, Input verification
+- Archive for viewing expired collages
+- Friends list
+
+Stretch Goals:
+- Widget for viewing the archive
+
 # PATCH'D - Project Division
 
 ## Oct 14th Meeting Tasks
