@@ -43,6 +43,27 @@ Stretch Goals:
 
 # PATCH'D - Project Division
 
+## Oct 16th Meeting Tasks
+- [ ]  Onboarding (Sign up & Sign in flow) - UI design Yvette Code @Janice
+   - [ ]    Include validation messages
+- [ ] Create a Collage @Janice
+   - [ ]        Custom theme name
+   - [ ]        Collage Duration / Expiration
+- [ ] Canvas View
+   - [ ]        Remove the layer of Canvas Detail view Ricky
+   - [ ]            Go straight to the Canvas from Collages
+   - [ ]        Collaborators icon Ricky
+   - [ ]            Add collaborators on bottom corner of canvas to see who’s collaborating on that collage
+   - [ ]        Add collaborator’s icon on the corner of the image to show who’s moving the image
+   - [ ]        Image movement Ricky
+   - [ ]            Positioning (Local vs Global) - fix
+   - [ ]            Rotate image around
+   - [ ]        Trash bin icon Ricky
+   - [ ]        Sticker png (transparent BG correction)
+- [ ] Invite Friends Page or Friends list - UI design Yvette Code @Janice
+- [ ] Download & Share collage flow
+- [ ] Add transitions / animations between screens — low priority
+
 ## Oct 14th Meeting Tasks
 - [ ] realtime dashboard - med
 - [ ] implement collaging - Camera/Library add, paste from photos app, add stickers from library - high
