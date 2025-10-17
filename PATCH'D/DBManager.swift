@@ -95,7 +95,7 @@ class CollageDBManager {
     
     //MARK: - Collage Functions
     
-    func createCollage(theme: String, duration: TimeInterval) async throws -> CollageSession {
+    func createCollage(theme: String, duration: TimeInterval, isPartyMode: Bool) async throws -> CollageSession {
         // Get current user
         let user = try await getCurrentUser()
         
@@ -115,6 +115,7 @@ class CollageDBManager {
             let expires_at: String
             let updated_at: String
             let background_url: String
+            let isPartyMode: Bool
         }
         
         let collageData = CollageInsert(
@@ -124,7 +125,8 @@ class CollageDBManager {
             starts_at: ISO8601DateFormatter().string(from: now),
             expires_at: ISO8601DateFormatter().string(from: expiresAt),
             updated_at: ISO8601DateFormatter().string(from: now),
-            background_url: "" // You may want to generate/select a background
+            background_url: "", // You may want to generate/select a background
+            isPartyMode: isPartyMode
         )
         
         let collage: Collage = try await supabase

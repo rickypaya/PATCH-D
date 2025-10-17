@@ -62,6 +62,7 @@ struct Collage: Identifiable, Codable {
     var updatedAt: Date
     var backgroundUrl: String?
     var previewUrl: String?
+    var isPartyMode: Bool
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -74,6 +75,7 @@ struct Collage: Identifiable, Codable {
         case updatedAt = "updated_at"
         case backgroundUrl = "background_url"
         case previewUrl = "preview_url"
+        case isPartyMode = "is_party_mode"
     }
 }
 

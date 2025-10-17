@@ -137,6 +137,12 @@ struct CollageGridView: View {
             LazyVGrid(columns: columns, spacing: 16) {
                 ForEach(appState.collageSessions) { session in
                     CollagePreviewCard(session: session)
+                        .onTapGesture {
+                            Task {
+                                await appState.selectCollageSession(session)
+                            }
+                        }
+                        
                 }
             }
             .padding()
@@ -149,37 +155,46 @@ struct CollagePreviewCard: View {
     let session: CollageSession
     
     var body: some View {
-        NavigationLink(destination: CollageDetailView(session: session)) {
+      
+
+        ZStack {
             VStack(alignment: .leading, spacing: 8) {
                 // Collage Preview Image
                 previewImageView
                 
-                // Theme
-                Text(session.theme)
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                
-                // Time Remaining
-                Text(timeRemainingText)
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                
-                // Members Count
-                HStack(spacing: 4) {
-                    Image(systemName: "person.2.fill")
+                Group {
+                    // Theme
+                    Text(session.theme)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    
+                    // Time Remaining
+                    Text(timeRemainingText)
                         .font(.caption)
                         .foregroundColor(.gray)
-                    Text("\(session.members.count)")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                    
+                    // Members Count
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                        Text("\(session.members.count)")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding()
+                    .background(Color.gray.opacity(0.2))
+                    .cornerRadius(16)
                 }
+                .padding(4)
+                
             }
-            .padding()
-            .background(Color.gray.opacity(0.2))
-            .cornerRadius(16)
+            .buttonStyle(PlainButtonStyle())
         }
-        .buttonStyle(PlainButtonStyle())
+        .background(Color.gray.opacity(0.7))
+        .cornerRadius(16)
+        
     }
     
     private var previewImageView: some View {
@@ -253,111 +268,6 @@ struct CollagePreviewCard: View {
             return "\(hours)h \(minutes)m left"
         } else {
             return "\(minutes)m left"
-        }
-    }
-}
-
-// MARK: - Create Collage Sheet
-struct CreateCollageSheet: View {
-    @EnvironmentObject var appState: AppState
-    @Environment(\.dismiss) var dismiss
-    
-    @State private var isCreating = false
-    @State private var selectedDuration: TimeInterval = 3600 // 1 hour default
-    @State private var errorMessage: String?
-    
-    let durationOptions: [(String, TimeInterval)] = [
-        ("30 minutes", 1800),
-        ("1 hour", 3600),
-        ("2 hours", 7200),
-        ("6 hours", 21600),
-        ("12 hours", 43200),
-        ("24 hours", 86400)
-    ]
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                Image(systemName: "photo.stack.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.green)
-                
-                Text("Create a Collage")
-                    .font(.title.bold())
-                
-                Text("A random theme will be assigned")
-                    .font(.body)
-                    .foregroundColor(.gray)
-                
-                // Duration Picker
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Duration")
-                        .font(.headline)
-                    
-                    Picker("Duration", selection: $selectedDuration) {
-                        ForEach(durationOptions, id: \.1) { option in
-                            Text(option.0).tag(option.1)
-                        }
-                    }
-                    .pickerStyle(MenuPickerStyle())
-                    .padding()
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(12)
-                }
-                .padding(.horizontal)
-                
-                if let error = errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                }
-                
-                Button(action: createCollage) {
-                    if isCreating {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else {
-                        Text("Create Collage")
-                            .font(.headline)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.green)
-                .foregroundColor(.white)
-                .cornerRadius(12)
-                .padding(.horizontal)
-                .disabled(isCreating)
-                
-                Spacer()
-            }
-            .padding()
-            .navigationBarItems(trailing: Button("Cancel") {
-                dismiss()
-            })
-        }
-    }
-    
-    private func createCollage() {
-        errorMessage = nil
-        isCreating = true
-        
-        Task {
-            do {
-                // Fetch random theme
-                let theme = try await appState.fetchRandomTheme()
-                
-                // Create collage with theme
-                await appState.createNewCollageSession(theme: theme, duration: selectedDuration)
-                
-                // Reload sessions
-                await appState.loadCollageSessions()
-                
-                dismiss()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-            isCreating = false
         }
     }
 }

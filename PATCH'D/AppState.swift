@@ -20,7 +20,7 @@ class AppState: ObservableObject {
     @Published var isAuthenticated = false
     @Published var currentUser: CollageUser? //logged in user profile
     @Published var collageSessions: [CollageSession] = [] //array of active collage sessions for user
-    @Published var selectedSession: CollageSession?
+    @Published var selectedSession: CollageSession? = nil
     @Published var collagePhotos: [CollagePhoto] = []
     @Published var isLoading = false //Is the app currently loading
     @Published var errorMessage: String? //error message if any present in app state
@@ -138,7 +138,7 @@ class AppState: ObservableObject {
         errorMessage = nil
     }
     
-    func createNewCollageSession(theme: String, duration: TimeInterval) async {
+    func createNewCollageSession(theme: String, duration: TimeInterval, isPartyMode: Bool) async {
         isLoading = true
         do {
             
@@ -146,7 +146,8 @@ class AppState: ObservableObject {
                 // Create collage
                 let session = try await dbManager.createCollage(
                     theme: theme,
-                    duration: duration
+                    duration: duration,
+                    isPartyMode: isPartyMode
                 )
             }catch{
                 errorMessage = "Error creating collage: \(error)"
