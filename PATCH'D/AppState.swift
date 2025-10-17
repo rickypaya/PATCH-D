@@ -25,6 +25,7 @@ class AppState: ObservableObject {
     @Published var isLoading = false //Is the app currently loading
     @Published var errorMessage: String? //error message if any present in app state
     @Published var currentState: CurrState = .dashboard //current app page
+    @Published var archive: [CollageSession] = []
     
     private var realTimeTask: Task <Void,Never>?
     
@@ -43,7 +44,6 @@ class AppState: ObservableObject {
     func loadCurrentUser() async {
         do {
             currentUser = try await dbManager.getCurrentUser()
-            print(currentUser)
         } catch {
             errorMessage = "Failed to load user: \(error.localizedDescription)"
             currentState = .signUp
@@ -52,8 +52,14 @@ class AppState: ObservableObject {
     
     func loadCollageSessions() async {
         isLoading = true
+        guard let currentUser = currentUser else {
+            errorMessage = "No user logged in"
+            isLoading = false
+            return
+        }
         do {
             collageSessions = try await dbManager.fetchSessions()
+            archive = try await dbManager.fetchExpiredSession()
         } catch {
             errorMessage = "Failed to load collage sessions: \(error.localizedDescription)"
         }
@@ -171,8 +177,6 @@ class AppState: ObservableObject {
         stopRealTimeSubscription()
         selectedSession = nil
         collagePhotos = []
-        
-        await loadCollageSessions()
         
     }
     
@@ -314,32 +318,30 @@ class AppState: ObservableObject {
     }
 
     
-//    //update user avatar
-//    func updateUserAvatar(_ image: UIImage) {
-//        print(currentUser)
-//        guard let userId = currentUser else {
-//            errorMessage = "No user logged in"
-//            return
-//        }
-//        
-//        Task {
-//            isLoading = true
-//            errorMessage = nil
-//            
-//            do {
-////                let avatarUrl = try await dbManager.uploadUserAvatar(userId: userId, image: image)
-//                
-//                // Refresh user profile to get updated avatar URL
-//                await loadCurrentUser()
-//                
-////                print("Avatar uploaded successfully: \(avatarUrl)")
-//            } catch {
-//                errorMessage = "Failed to upload avatar: \(error.localizedDescription)"
-//                print(errorMessage ?? "")
-//            }
-//            
-//            isLoading = false
-//        }
-//        
-//    }
+    //update user avatar
+    func updateUserAvatar(_ image: UIImage) {
+               
+        Task {
+            isLoading = true
+            errorMessage = nil
+            guard let currentId: UUID = currentUser?.id else {
+                errorMessage = "Please log in first."
+                return
+            }
+            do {
+                let avatarUrl = try await dbManager.uploadUserAvatar(userId: currentId , image: image)
+                
+                // Refresh user profile to get updated avatar URL
+                await loadCurrentUser()
+                
+//                print("Avatar uploaded successfully: \(avatarUrl)")
+            } catch {
+                errorMessage = "Failed to upload avatar: \(error.localizedDescription)"
+                print(errorMessage ?? "")
+            }
+            
+            isLoading = false
+        }
+        
+    }
 }

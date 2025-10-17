@@ -31,9 +31,6 @@ struct ProfileView: View {
                                     .scaledToFill()
                                     .frame(width: 120, height: 120)
                                     .clipShape(Circle())
-                                    .task {
-//                                        appState.updateUserAvatar(image)
-                                    }
                             } else if let avatarUrl = appState.currentUser?.avatarUrl,
                                       let url = URL(string: avatarUrl), let user = appState.currentUser {
                                 // Display existing avatar from URL
@@ -48,14 +45,17 @@ struct ProfileView: View {
                                     case .failure(_), .empty:
                                         // Fallback to default avatar if loading fails
                                         defaultMemberAvatar(for: user)
+                                            .frame(width: 120, height: 120)
                                     @unknown default:
                                         defaultMemberAvatar(for: user)
+                                            .frame(width: 120, height: 120)
                                     }
                                 }
                             } else {
                                 // Default avatar with initial
                                 let user = appState.currentUser
                                 defaultMemberAvatar(for: user!)
+                                    .frame(width: 120, height: 120)
                             }
                             
                             // Camera button overlay
@@ -208,11 +208,11 @@ struct ProfileView: View {
             .sheet(isPresented: $showCamera) {
                 ImagePicker(image: $selectedImage, sourceType: UIImagePickerController.SourceType.camera)
             }
-//            .onChange(of: selectedImage) { oldValue, newValue in
-//                if let image = newValue {
-//                    addPhotoToCanvas(image: image, in: canvasSize)
-//                }
-//            }
+            .onChange(of: selectedImage) { oldValue, newValue in
+                if let image = newValue {
+                    appState.updateUserAvatar(image)
+                }
+            }
         }
     }
     private func addPhotoToCanvas(image: UIImage, in viewSize: CGSize) {

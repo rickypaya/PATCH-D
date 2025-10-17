@@ -33,12 +33,15 @@ struct MembersListView: View {
                                                 .clipShape(Circle())
                                         case .failure(_), .empty:
                                             defaultMemberAvatar(for: member)
+                                                .frame(width: 35, height: 35)
                                         @unknown default:
                                             defaultMemberAvatar(for: member)
+                                                .frame(width: 35, height: 35)
                                         }
                                     }
                                 } else {
                                     defaultMemberAvatar(for: member)
+                                        .frame(width: 35, height: 35)
                                 }
                                 
                                 // Username

@@ -30,7 +30,6 @@ import Combine
 func defaultMemberAvatar(for member: CollageUser) -> some View {
     Circle()
         .fill(Color.blue.opacity(0.7))
-        .frame(width: 35, height: 35)
         .overlay(
             Text(member.username.prefix(1).uppercased())
                 .font(.caption.bold())

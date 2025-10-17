@@ -5,6 +5,7 @@ struct DashboardView: View {
     @EnvironmentObject var appState: AppState
     @State private var showInviteCodeSheet = false
     @State private var showCreateCollageSheet = false
+    @State private var showArchiveSheet = false
     
     var body: some View {
         NavigationView {
@@ -49,6 +50,11 @@ struct DashboardView: View {
                         }) {
                             Label("Join with Code", systemImage: "link")
                         }
+                        Button (action: {
+                            showArchiveSheet = true
+                        }) {
+                        Label("View Archive", systemImage: "archivebox")
+                        }
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
@@ -61,6 +67,9 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showCreateCollageSheet) {
                 CreateCollageSheet()
+            }
+            .sheet(isPresented: $showArchiveSheet) {
+                ArchiveSheet()
             }
             .refreshable {
                 await appState.loadCollageSessions()

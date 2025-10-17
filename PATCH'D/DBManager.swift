@@ -28,6 +28,7 @@ class CollageDBManager {
     //async joinCollageByInviteCode(inviteCode) -> CollageSession
     //async fetchCollage(collageId) -> CollageSession
     //async fetchSessions() -> [CollageSession]
+    //async fetchExpiredSession() -> [CollageSession]
     //async fetchUser(userId) -> CollageUser
     //async fetchCollageMembers(collageId) -> [CollageUsers]
     //async updateUserName(username) -> None
@@ -294,17 +295,17 @@ class CollageDBManager {
 
     func uploadUserAvatar(userId: UUID, image: UIImage) async throws -> String {
         // Compress image to JPEG data
-        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
+        guard let imageData = image.pngData() else {
             throw NSError(domain: "DB", code: 400, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"])
         }
         
         // Generate unique filename
-        let filename = "\(userId.uuidString)_\(Date().timeIntervalSince1970).jpg"
+        let filename = "\(userId.uuidString)_\(Date().timeIntervalSince1970).png"
         let filePath = "avatars/\(filename)"
         // Upload to Supabase storage
         try await supabase.storage
             .from("patchd-storage")
-            .upload(path: filePath, file: imageData, options: FileOptions(contentType: "image/jpeg"))
+            .upload(path: filePath, file: imageData, options: FileOptions(contentType: "image/png"))
         // Get public URL
         let publicURL = try supabase.storage
             .from("patchd-storage")
