@@ -14,6 +14,7 @@ struct CollageFullscreenView: View {
     @State private var showCamera = false
     @State private var selectedImage: UIImage?
     @State private var canvasSize: CGSize = .zero
+    @State private var showStickerLibrary = false
     
     struct PhotoState {
         var offset: CGSize = .zero
@@ -89,6 +90,21 @@ struct CollageFullscreenView: View {
                         
                         Spacer()
                         
+                        // add sticker button
+                        Button(action: {
+                            showStickerLibrary = true
+                        }) {
+                            // Use your custom sticker icon from Assets
+                            Image("stickerIcon")  // Replace with your actual asset name
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 24, height: 24)
+                                .foregroundColor(.white)
+                                .frame(width: 40, height: 40)
+                                .background(Color.purple.opacity(0.8))
+                                .clipShape(Circle())
+                        }
+                        
                         // Add Photo Button
                         Button(action: {
                             showImageSourcePicker = true
@@ -123,6 +139,12 @@ struct CollageFullscreenView: View {
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(image: $selectedImage, sourceType: UIImagePickerController.SourceType.photoLibrary)
         }
+        .sheet(isPresented: $showStickerLibrary) {
+            StickerLibraryView { stickerURL in
+                addStickerToCanvas(stickerURL: stickerURL, in: canvasSize)
+            }
+        }
+
         .sheet(isPresented: $showCamera) {
             ImagePicker(image: $selectedImage, sourceType: UIImagePickerController.SourceType.camera)
         }
@@ -155,6 +177,25 @@ struct CollageFullscreenView: View {
         Task {
             await appState.addPhotoFromImage(image, at: centerPoint, in: viewSize)
             selectedImage = nil // Reset after adding
+        }
+    }
+    private func addStickerToCanvas(stickerURL: String, in viewSize: CGSize) {
+        // Download the sticker image
+        guard let url = URL(string: stickerURL) else { return }
+        
+        Task {
+            do {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                
+                if let image = UIImage(data: data) {
+                    // Add sticker at center of screen
+                    let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
+                    
+                    await appState.addPhotoFromImage(image, at: centerPoint, in: viewSize)
+                }
+            } catch {
+                print("Failed to download sticker: \(error)")
+            }
         }
     }
     

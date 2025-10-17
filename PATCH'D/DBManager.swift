@@ -591,4 +591,21 @@ class CollageDBManager {
         return String((0..<8).map { _ in characters.randomElement()! })
     }
     
+    //MARK: - Storage Helper Functions
+
+    func listFilesInFolder(bucket: String, folder: String) async throws -> [String] {
+        let files = try await supabase.storage
+            .from(bucket)
+            .list(path: folder)
+        
+        return files.map { $0.name }
+    }
+
+    func getPublicURL(bucket: String, path: String) throws -> String {
+        let publicURL = try supabase.storage
+            .from(bucket)
+            .getPublicURL(path: path)
+        
+        return publicURL.absoluteString
+    }
 }
