@@ -17,7 +17,9 @@ struct CollageFullscreenView: View {
     @State private var canvasSize: CGSize = .zero
     @State private var showStickerLibrary = false
     @State private var pasteErrorMessage: String?
-
+    @State private var trashIconFrame: CGRect = .zero
+    @State private var isOverTrash = false
+    @State private var clearToolbar = false
 
     struct PhotoState {
         var offset: CGSize = .zero
@@ -26,10 +28,12 @@ struct CollageFullscreenView: View {
         var lastOffset: CGSize = .zero
         var lastRotation: Angle = .zero
         var lastScale: CGFloat = 1.0
+        var globalPosition: CGPoint = .zero
     }
     
     var body: some View {
         GeometryReader { geometry in
+            // Main Canvas Layer
             ZStack {
                 Color.gray.opacity(0.2)
                     .ignoresSafeArea()
@@ -41,92 +45,83 @@ struct CollageFullscreenView: View {
                             photo: photo,
                             viewSize: geometry.size,
                             state: photoStates[photo.id] ?? PhotoState(),
-                            onDragChanged: { value in handleDragChanged(photo: photo, value: value) },
-                            onDragEnded: { value in handleDragEnded(photo: photo, value: value, in: geometry.size) },
+                            isBlurred: session.collage.isPartyMode && photo.user_id != appState.currentUser?.id,
+                            onDragChanged: { value in handleDragChanged(photo: photo, value: value, in: geometry) },
+                            onDragEnded: { value in handleDragEnded(photo: photo, value: value, in: geometry) },
                             onMagnifyChanged: { value in handleMagnifyChanged(photo: photo, value: value) },
-                            onMagnifyEnded: { _ in handleMagnifyEnded(photo: photo, in: geometry.size) },
+                            onMagnifyEnded: { _ in handleMagnifyEnded(photo: photo, in: geometry) },
                             onRotationChanged: { value in handleRotationChanged(photo: photo, value: value) },
-                            onRotationEnded: { _ in handleRotationEnded(photo: photo, in: geometry.size) }
+                            onRotationEnded: { _ in handleRotationEnded(photo: photo, in: geometry) }
                         )
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .contentShape(Rectangle())
-                .onAppear { canvasSize = geometry.size }
-                
-                // Top Bar with Close, Paste, and Add buttons
-                VStack {
-                    HStack {
-                        // Close Button
-                        Button(action: {
+                .onAppear {
+                    canvasSize = geometry.size
+                }
+            }
+        }
+        .overlay(
+            // Top Toolbar Overlay (hidden when saving)
+            Group {
+                if !clearToolbar {
+                    TopToolbarView(
+                        onClose: {
                             Task {
+                                // Set saving state to hide overlays
+                                clearToolbar = true
+                                
+                                // Small delay to allow UI to update
+                                try? await Task.sleep(nanoseconds: 100_000_000)
+                                
                                 if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                                    let window = windowScene.windows.first,
                                    let rootView = window.rootViewController?.view {
                                     await appState.deselectCollageSession(captureView: rootView)
-                                    
-                                    try await Task.sleep(nanoseconds: UInt64(5) * 1_000_000_000)
                                 }
+                                
                                 dismiss()
                             }
-                        }) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 40, height: 40)
-                                .background(Color.black.opacity(0.6))
-                                .clipShape(Circle())
-                        }
-                        
-                        Spacer()
-                        
-                        // add sticker button
-                        Button(action: {
-                            showStickerLibrary = true
-                        }) {
-                            // Use your custom sticker icon from Assets
-                            Image("stickerIcon")  // Replace with your actual asset name
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 24, height: 24)
-                                .foregroundColor(.white)
-                                .frame(width: 40, height: 40)
-                                .background(Color.purple.opacity(0.8))
-                                .clipShape(Circle())
-                        }
-                        // Paste Button
-                        Button(action: {
-                            handlePasteAction(in: geometry.size)
-                        }) {
-                            Image(systemName: "doc.on.clipboard")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 40, height: 40)
-                                .background(Color.green.opacity(0.8))
-                                .clipShape(Circle())
-                        }
-                        .padding(.trailing, 8)
-                        
-                        // Add Photo Button
-                        Button(action: {
-                            showImageSourcePicker = true
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 40, height: 40)
-                                .background(Color.blue.opacity(0.8))
-                                .clipShape(Circle())
-                        }
-                    }
-                    .padding()
-                    
-                    Spacer()
+                        },
+                        onCopyCode: { UIPasteboard.general.string = session.inviteCode   },
+                        onAddSticker: { showStickerLibrary = true },
+                        onPaste: {
+                            Task {
+                                await handlePasteAction(in: canvasSize)
+                            }
+                        },
+                        onAddPhoto: { showImageSourcePicker = true },
+                        clearToolbar: clearToolbar
+                    )
                 }
+            },
+            alignment: .top
+        )
+        .overlay(
+            // Bottom Toolbar Overlay (hidden when saving)
+            Group {
+                if !clearToolbar {
+                    BottomToolbarView(
+                        members: appState.collageMembers,
+                        isOverTrash: isOverTrash,
+                        onTrashFrameChange: { frame in
+                            trashIconFrame = frame
+                        },
+                        clearToolbar: clearToolbar
+                    )
+                }
+            },
+            alignment: .bottom
+        )
+        .ignoresSafeArea(.all)
+        .navigationBarHidden(true)
+        .onAppear {
+            initializePhotoStates()
+            Task {
+                await appState.loadCollageMembersForSession(collage_id: session.id)
             }
         }
-        .navigationBarHidden(true)
-        .onAppear { initializePhotoStates() }
         .confirmationDialog("Add Photo", isPresented: $showImageSourcePicker) {
             Button("Take Photo") { showCamera = true }
             Button("Choose from Library") { showImagePicker = true }
@@ -140,9 +135,25 @@ struct CollageFullscreenView: View {
                 addStickerToCanvas(stickerURL: stickerURL, in: canvasSize)
             }
         }
-
         .sheet(isPresented: $showCamera) {
             ImagePicker(image: $selectedImage, sourceType: .camera)
+        }
+        .onChange(of: appState.collagePhotos.count) { _, _ in
+            // Initialize photo states for any new photos
+            for photo in appState.collagePhotos {
+                if photoStates[photo.id] == nil {
+                    let globalX = CGFloat(photo.position_x)
+                    let globalY = CGFloat(photo.position_y)
+                    
+                    photoStates[photo.id] = PhotoState(
+                        rotation: Angle(degrees: photo.rotation),
+                        scale: photo.scale,
+                        lastRotation: Angle(degrees: photo.rotation),
+                        lastScale: photo.scale,
+                        globalPosition: CGPoint(x: globalX, y: globalY)
+                    )
+                }
+            }
         }
         .onChange(of: selectedImage) { _, newValue in
             if let image = newValue {
@@ -157,31 +168,34 @@ struct CollageFullscreenView: View {
     }
     
     // MARK: - Paste Handling
-    private func handlePasteAction(in viewSize: CGSize) {
+    private func handlePasteAction(in viewSize: CGSize) async {
         let pasteboard = UIPasteboard.general
-        
+        let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
         if let image = pasteboard.image {
-            // Directly pasted UIImage (like a cutout from Photos)
             addPhotoToCanvas(image: image, in: viewSize)
-        } else if let data = pasteboard.data(forPasteboardType: "public.png"),
-                  let image = UIImage(data: data) {
-            // Fallback if the pasteboard contains PNG data
-            addPhotoToCanvas(image: image, in: viewSize)
+        } else if let data = pasteboard.data(forPasteboardType: "public.png") {
+//            addPhotoToCanvas(image: image, in: viewSize)
+            await appState.addPhotoFromPasteboard(at: centerPoint)
         } else {
             pasteErrorMessage = "No image found in clipboard. Try copying an image or cutout first."
         }
     }
-    
+
     // MARK: - Helpers
     
     private func initializePhotoStates() {
         for photo in appState.collagePhotos {
             if photoStates[photo.id] == nil {
+                // Convert normalized position to global coordinates
+                let globalX = CGFloat(photo.position_x)
+                let globalY = CGFloat(photo.position_y)
+                
                 photoStates[photo.id] = PhotoState(
                     rotation: Angle(degrees: photo.rotation),
                     scale: photo.scale,
                     lastRotation: Angle(degrees: photo.rotation),
-                    lastScale: photo.scale
+                    lastScale: photo.scale,
+                    globalPosition: CGPoint(x: globalX, y: globalY)
                 )
             }
         }
@@ -191,24 +205,23 @@ struct CollageFullscreenView: View {
         let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
         
         Task {
-            await appState.addPhotoFromImage(image, at: centerPoint, in: viewSize)
+//            await appState.addPhotoFromImage(image, at: centerPoint)
+            let imageUrl = try await appState.uploadPhotoToStorage(image)
+            guard let url = URL(string: imageUrl) else { return }
+            await appState.addPhotoToCollage(url, at: centerPoint)
             selectedImage = nil
         }
     }
+    
     private func addStickerToCanvas(stickerURL: String, in viewSize: CGSize) {
-        // Download the sticker image
         guard let url = URL(string: stickerURL) else { return }
         
         Task {
             do {
                 let (data, _) = try await URLSession.shared.data(from: url)
-                
-                if let image = UIImage(data: data) {
-                    // Add sticker at center of screen
-                    let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
-                    
-                    await appState.addPhotoFromImage(image, at: centerPoint, in: viewSize)
-                }
+                let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
+//                    await appState.addPhotoFromImage(image, at: centerPoint)
+                await appState.addPhotoToCollage(url, at: centerPoint)
             } catch {
                 print("Failed to download sticker: \(error)")
             }
@@ -216,26 +229,69 @@ struct CollageFullscreenView: View {
     }
     
     // MARK: - Gesture Handlers
-    private func handleDragChanged(photo: CollagePhoto, value: DragGesture.Value) {
+    private func handleDragChanged(photo: CollagePhoto, value: DragGesture.Value, in geometry: GeometryProxy) {
         var state = photoStates[photo.id] ?? PhotoState()
+        
+        // Update offset
         state.offset = CGSize(
             width: state.lastOffset.width + value.translation.width,
             height: state.lastOffset.height + value.translation.height
         )
+        
+        // Calculate current global position
+        let currentGlobalPosition = CGPoint(
+            x: state.globalPosition.x + state.offset.width,
+            y: state.globalPosition.y + state.offset.height
+        )
+        
+        // Check if over trash
+        let photoFrame = CGRect(
+            x: currentGlobalPosition.x - 50,
+            y: currentGlobalPosition.y - 50,
+            width: 100,
+            height: 100
+        )
+        
+        isOverTrash = trashIconFrame.intersects(photoFrame)
+        draggedPhotoId = photo.id
+        
         photoStates[photo.id] = state
     }
     
-    private func handleDragEnded(photo: CollagePhoto, value: DragGesture.Value, in viewSize: CGSize) {
+    private func handleDragEnded(photo: CollagePhoto, value: DragGesture.Value, in geometry: GeometryProxy) {
         var state = photoStates[photo.id] ?? PhotoState()
-        state.lastOffset = state.offset
-        photoStates[photo.id] = state
         
-        let position = calculateAbsolutePosition(photo: photo, state: state, in: viewSize)
+        // Check if dropped on trash
+        if isOverTrash {
+            if photo.user_id == appState.currentUser?.id {
+                Task {
+                    await appState.deletePhoto(photo)
+                }
+            }
+            isOverTrash = false
+            draggedPhotoId = nil
+            return
+        }
+        
+        // Update global position
+        state.globalPosition = CGPoint(
+            x: state.globalPosition.x + state.offset.width,
+            y: state.globalPosition.y + state.offset.height
+        )
+        state.offset = .zero
+        state.lastOffset = .zero
+        
+        photoStates[photo.id] = state
+        draggedPhotoId = nil
+        isOverTrash = false
         
         Task {
-            await appState.updatePhotoTransform(photo, position: position,
-                                                rotation: state.rotation.degrees,
-                                                scale: state.scale, in: viewSize)
+            await appState.updatePhotoTransform(
+                photo,
+                position: state.globalPosition,
+                rotation: state.rotation.degrees,
+                scale: state.scale
+            )
         }
     }
     
@@ -245,15 +301,18 @@ struct CollageFullscreenView: View {
         photoStates[photo.id] = state
     }
     
-    private func handleMagnifyEnded(photo: CollagePhoto, in viewSize: CGSize) {
+    private func handleMagnifyEnded(photo: CollagePhoto, in geometry: GeometryProxy) {
         var state = photoStates[photo.id] ?? PhotoState()
         state.lastScale = state.scale
         photoStates[photo.id] = state
-        let position = calculateAbsolutePosition(photo: photo, state: state, in: viewSize)
+        
         Task {
-            await appState.updatePhotoTransform(photo, position: position,
-                                                rotation: state.rotation.degrees,
-                                                scale: state.scale, in: viewSize)
+            await appState.updatePhotoTransform(
+                photo,
+                position: state.globalPosition,
+                rotation: state.rotation.degrees,
+                scale: state.scale
+            )
         }
     }
     
@@ -263,21 +322,168 @@ struct CollageFullscreenView: View {
         photoStates[photo.id] = state
     }
     
-    private func handleRotationEnded(photo: CollagePhoto, in viewSize: CGSize) {
+    private func handleRotationEnded(photo: CollagePhoto, in geometry: GeometryProxy) {
         var state = photoStates[photo.id] ?? PhotoState()
         state.lastRotation = state.rotation
         photoStates[photo.id] = state
-        let position = calculateAbsolutePosition(photo: photo, state: state, in: viewSize)
+        
         Task {
-            await appState.updatePhotoTransform(photo, position: position,
-                                                rotation: state.rotation.degrees,
-                                                scale: state.scale, in: viewSize)
+            await appState.updatePhotoTransform(
+                photo,
+                position: state.globalPosition,
+                rotation: state.rotation.degrees,
+                scale: state.scale
+            )
         }
     }
+}
+
+// MARK: - Top Toolbar View
+struct TopToolbarView: View {
+    let onClose: () -> Void
+    let onCopyCode: () -> Void
+    let onAddSticker: () -> Void
+    let onPaste: () -> Void
+    let onAddPhoto: () -> Void
+    let clearToolbar: Bool
     
-    private func calculateAbsolutePosition(photo: CollagePhoto, state: PhotoState, in viewSize: CGSize) -> CGPoint {
-        let baseX = CGFloat(photo.position_x) * viewSize.width
-        let baseY = CGFloat(photo.position_y) * viewSize.height
-        return CGPoint(x: baseX + state.offset.width, y: baseY + state.offset.height)
+    var body: some View {
+        ZStack {
+            HStack {
+                // Close Button
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Circle())
+                }
+                
+                Spacer()
+                
+                // Add Sticker Button
+                Button(action: onAddSticker) {
+                    Image("stickerIcon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.purple.opacity(0.8))
+                        .clipShape(Circle())
+                }
+                
+                //Copy Invite Button
+                Button(action: onCopyCode) {
+                    Image(systemName: "document.on.document")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.blue.opacity(0.8))
+                        .clipShape(Circle())
+                }
+                
+                // Paste Button
+                Button(action: onPaste) {
+                    Image(systemName: "doc.on.clipboard")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.green.opacity(0.8))
+                        .clipShape(Circle())
+                }
+                
+                // Add Photo Button
+                Button(action: onAddPhoto) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(Color.blue.opacity(0.8))
+                        .clipShape(Circle())
+                }
+            }
+            .padding()
+            .frame(height: 120)
+        }
+        .padding(.top, 16)
+    }
+}
+
+// MARK: - Bottom Toolbar View
+struct BottomToolbarView: View {
+    let members: [CollageUser]
+    let isOverTrash: Bool
+    let onTrashFrameChange: (CGRect) -> Void
+    let clearToolbar: Bool
+    
+    var body: some View {
+        HStack(alignment: .bottom) {
+            // Active Members List
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(members) { member in
+                        VStack(spacing: 4) {
+                            AsyncImage(url: URL(string: member.avatarUrl ?? "")) { image in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            } placeholder: {
+                                Image(systemName: "person.circle.fill")
+                                    .resizable()
+                                    .foregroundColor(.gray)
+                            }
+                            .frame(width: 40, height: 40)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                            
+                            Text(member.username)
+                                .font(.caption2)
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .frame(maxWidth: UIScreen.main.bounds.width * 0.7)
+            
+            Spacer()
+            
+            // Trash Icon for Delete
+            ZStack {
+                Circle()
+                    .fill(isOverTrash ? Color.red.opacity(0.9) : Color.red.opacity(0.6))
+                    .frame(width: 60, height: 60)
+                
+                Image(systemName: isOverTrash ? "trash.fill" : "trash")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+            .background(
+                GeometryReader { geo in
+                    Color.clear.onAppear {
+                        onTrashFrameChange(geo.frame(in: .global))
+                    }
+                    .onChange(of: geo.frame(in: .global)) { _, newFrame in
+                        onTrashFrameChange(newFrame)
+                    }
+                }
+            )
+            .padding(.trailing, 16)
+            .scaleEffect(isOverTrash ? 1.2 : 1.0)
+            .animation(.spring(response: 0.3), value: isOverTrash)
+        }
+        .padding(.bottom, 40)
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [Color.clear, Color.black.opacity(0.6)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 150)
+            .ignoresSafeArea(edges: .bottom)
+        )
     }
 }

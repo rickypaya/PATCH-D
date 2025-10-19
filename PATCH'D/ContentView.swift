@@ -79,6 +79,7 @@ struct ContentView: View {
                 CollageFullscreenView(session: appState.selectedSession!)
             }
         }
+        .animation(.easeIn, value: appState.currentState)
         .environmentObject(appState)
     }
 }

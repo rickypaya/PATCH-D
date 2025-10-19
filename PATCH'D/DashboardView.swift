@@ -10,12 +10,12 @@ struct DashboardView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.black.ignoresSafeArea()
+                Color.gray.ignoresSafeArea()
                 
                 if appState.isLoading {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                } else if appState.collageSessions.isEmpty {
+                } else if appState.activeSessions.isEmpty {
                     EmptyStateView(
                         showInviteCodeSheet: $showInviteCodeSheet,
                         showCreateCollageSheet: $showCreateCollageSheet
@@ -144,11 +144,13 @@ struct CollageGridView: View {
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(appState.collageSessions) { session in
+                ForEach(appState.activeSessions) { session in
                     CollagePreviewCard(session: session)
                         .onTapGesture {
                             Task {
                                 await appState.selectCollageSession(session)
+                                
+                                try? await Task.sleep(nanoseconds: 200_000_000)
                             }
                         }
                         
@@ -162,6 +164,7 @@ struct CollageGridView: View {
 // MARK: - Collage Preview Card
 struct CollagePreviewCard: View {
     let session: CollageSession
+    @State var preview_url: String?
     
     var body: some View {
       
@@ -201,8 +204,11 @@ struct CollagePreviewCard: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .background(Color.gray.opacity(0.7))
+        .background(Color.black.opacity(0.7))
         .cornerRadius(16)
+        .onAppear{
+            preview_url = session.preview_url ?? ""
+        }
         
     }
     
@@ -213,7 +219,7 @@ struct CollagePreviewCard: View {
                     .aspectRatio(1, contentMode: .fit)
                     .cornerRadius(12)
                 
-                if let previewUrl = session.preview_url, let url = URL(string: previewUrl) {
+                if let previewUrl = preview_url, let url = URL(string: previewUrl) {
                     // Display preview image if available
                     AsyncImage(url: url) { phase in
                         switch phase {
@@ -277,6 +283,87 @@ struct CollagePreviewCard: View {
             return "\(hours)h \(minutes)m left"
         } else {
             return "\(minutes)m left"
+        }
+    }
+}
+
+// MARK: - Invite Code Sheet
+struct InviteCodeSheet: View {
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) var dismiss
+    
+    @State private var inviteCode = ""
+    @State private var isJoining = false
+    @State private var errorMessage: String?
+    
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 24) {
+                Image(systemName: "link.circle.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(.blue)
+                
+                Text("Join a Collage")
+                    .font(.title.bold())
+                
+                Text("Enter the 8-character invite code")
+                    .font(.body)
+                    .foregroundColor(.gray)
+                
+                TextField("Invite Code", text: $inviteCode)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .padding(.horizontal)
+                    .onChange(of: inviteCode) {
+                        inviteCode = inviteCode.uppercased()
+                    }
+                
+                if let error = errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+                
+                Button(action: joinCollage) {
+                    if isJoining {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    } else {
+                        Text("Join Collage")
+                            .font(.headline)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(inviteCode.count == 8 ? Color.blue : Color.gray)
+                .foregroundColor(.white)
+                .cornerRadius(12)
+                .padding(.horizontal)
+                .disabled(inviteCode.count != 8 || isJoining)
+                
+                Spacer()
+            }
+            .padding()
+            .navigationBarItems(trailing: Button("Cancel") {
+                dismiss()
+            })
+        }
+    }
+    
+    private func joinCollage() {
+        errorMessage = nil
+        isJoining = true
+        
+        Task {
+            do {
+                _ = try await CollageDBManager.shared.joinCollageByInviteCode(inviteCode: inviteCode, user: appState.currentUser!)
+                await appState.loadCollageSessions()
+                dismiss()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isJoining = false
         }
     }
 }

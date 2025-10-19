@@ -1,11 +1,11 @@
 import SwiftUI
 
-// MARK: - CollagePhotoView
-
+//// MARK: - Collage Photo View (Updated)
 struct CollagePhotoView: View {
     let photo: CollagePhoto
     let viewSize: CGSize
     let state: CollageFullscreenView.PhotoState
+    let isBlurred: Bool
     let onDragChanged: (DragGesture.Value) -> Void
     let onDragEnded: (DragGesture.Value) -> Void
     let onMagnifyChanged: (MagnificationGesture.Value) -> Void
@@ -14,44 +14,38 @@ struct CollagePhotoView: View {
     let onRotationEnded: (RotationGesture.Value) -> Void
     
     var body: some View {
-        AsyncImage(url: URL(string: photo.image_url)) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 200, height: 200)
-            case .failure:
-                Image(systemName: "photo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 200, height: 200)
-                    .foregroundColor(.gray)
-            case .empty:
-                ProgressView()
-                    .frame(width: 200, height: 200)
-            @unknown default:
-                EmptyView()
-            }
+        AsyncImage(url: URL(string: photo.image_url)) { image in
+            image
+                .resizable()
+                .scaledToFit()
+                .frame(width: 150, height: 150)
+                .blur(radius: isBlurred ? 20 : 0)
+                .overlay(
+                    isBlurred ?
+                    Image(systemName: "lock.fill")
+                        .font(.largeTitle)
+                        .foregroundColor(.white.opacity(0.8))
+                    : nil
+                )
+        } placeholder: {
+            ProgressView()
+                .frame(width: 150, height: 150)
         }
-        .scaleEffect(state.scale)
         .rotationEffect(state.rotation)
+        .scaleEffect(state.scale)
         .offset(state.offset)
-        .position(
-            x: CGFloat(photo.position_x) * viewSize.width,
-            y: CGFloat(photo.position_y) * viewSize.height
-        )
+        .position(state.globalPosition)
         .gesture(
             DragGesture()
                 .onChanged(onDragChanged)
                 .onEnded(onDragEnded)
         )
-        .gesture(
+        .simultaneousGesture(
             MagnificationGesture()
                 .onChanged(onMagnifyChanged)
                 .onEnded(onMagnifyEnded)
         )
-        .gesture(
+        .simultaneousGesture(
             RotationGesture()
                 .onChanged(onRotationChanged)
                 .onEnded(onRotationEnded)
