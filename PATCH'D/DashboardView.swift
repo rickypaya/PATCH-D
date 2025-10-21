@@ -356,13 +356,10 @@ struct InviteCodeSheet: View {
         isJoining = true
         
         Task {
-            do {
-                _ = try await CollageDBManager.shared.joinCollageByInviteCode(inviteCode: inviteCode, user: appState.currentUser!)
-                await appState.loadCollageSessions()
-                dismiss()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+            await appState.joinCollageWithInviteCode(inviteCode)
+            await appState.loadCollageSessions()
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            dismiss()
             isJoining = false
         }
     }

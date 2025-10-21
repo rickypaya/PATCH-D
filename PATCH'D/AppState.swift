@@ -22,6 +22,7 @@ class AppState: ObservableObject {
     
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var photoUpdates: [UUID] = []
     
     // MARK: - Cache for UI optimization
     private var sessionCache: [UUID: CollageSession] = [:]
@@ -42,8 +43,6 @@ class AppState: ObservableObject {
             
             // Auto-cleanup expired collages in background
             autoCleanupExpiredCollages()
-            
-            currentState = .dashboard
             isLoading = false
         }
     }
@@ -67,6 +66,7 @@ class AppState: ObservableObject {
         }
         do {
             collageMemberships = try await dbManager.fetchMemberships(userId: currentUser.id)
+            currentState = .dashboard
         } catch {
             errorMessage = "Failed to load user memberships: \(error.localizedDescription)"
         }
@@ -147,6 +147,7 @@ class AppState: ObservableObject {
             if let sessionId = selectedSession?.id {
                 photoCache[sessionId] = collagePhotos
             }
+            photoUpdates.append(photo.id)
             
         } catch {
             errorMessage = "Failed to delete photo: \(error.localizedDescription)"
@@ -324,11 +325,52 @@ class AppState: ObservableObject {
         
         realTimeTask = dbManager.subscribeToPhotoUpdates(sessionId: session.id) { [weak self] updatedPhotos in
             Task { @MainActor in
-                self?.collagePhotos = updatedPhotos
+                guard let self = self else { return }
                 
-                // Update cache
-                if let sessionId = self?.selectedSession?.id {
-                    self?.photoCache[sessionId] = updatedPhotos
+                // Create a set of current photo IDs for efficient lookup
+                let currentPhotoIds = Set(self.collagePhotos.map { $0.id })
+                let updatedPhotoIds = Set(updatedPhotos.map { $0.id })
+                
+                // Handle INSERTS - new photos that weren't in the current list
+                let insertedPhotos = updatedPhotos.filter { !currentPhotoIds.contains($0.id) }
+                for newPhoto in insertedPhotos {
+                    self.collagePhotos.append(newPhoto)
+                    print("Real-time: Photo inserted - \(newPhoto.id)")
+                }
+                
+                // Handle UPDATES - photos that exist in both lists but may have changed
+                for updatedPhoto in updatedPhotos {
+                    if let index = self.collagePhotos.firstIndex(where: { $0.id == updatedPhoto.id }) {
+                        let currentPhoto = self.collagePhotos[index]
+                        
+                        // Check if any properties have changed
+                        if currentPhoto.position_x != updatedPhoto.position_x ||
+                           currentPhoto.position_y != updatedPhoto.position_y ||
+                           currentPhoto.rotation != updatedPhoto.rotation ||
+                           currentPhoto.scale != updatedPhoto.scale {
+                            self.collagePhotos[index] = updatedPhoto
+                            
+                            var position = CGPoint(x: updatedPhoto.position_x, y: updatedPhoto.position_y)
+                            
+                            await self.updatePhotoTransform(currentPhoto,position: position, rotation: updatedPhoto.rotation, scale: updatedPhoto.scale)
+                            
+                            print("Real-time: Photo updated - \(updatedPhoto.id)")
+                        }
+                    }
+                }
+                
+                // Handle DELETES - photos that were in current list but not in updated list
+                let deletedPhotoIds = currentPhotoIds.subtracting(updatedPhotoIds)
+                if !deletedPhotoIds.isEmpty {
+                    self.collagePhotos.removeAll { deletedPhotoIds.contains($0.id) }
+                    for deletedId in deletedPhotoIds {
+                        print("Real-time: Photo deleted - \(deletedId)")
+                    }
+                }
+                
+                // Update cache with latest photos
+                if let sessionId = self.selectedSession?.id {
+                    self.photoCache[sessionId] = self.collagePhotos
                 }
             }
         }
@@ -444,6 +486,9 @@ class AppState: ObservableObject {
                 if let sessionId = selectedSession?.id {
                     photoCache[sessionId] = collagePhotos
                 }
+                
+                photoUpdates.append(photo.id)
+                print(photoUpdates)
             }
         } catch {
             errorMessage = "Failed to update photo: \(error.localizedDescription)"

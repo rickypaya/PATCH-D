@@ -116,6 +116,16 @@ struct CollagePhoto: Identifiable, Codable {
 
 }
 
+struct PhotoState {
+    var offset: CGSize = .zero
+    var rotation: Angle = .zero
+    var scale: CGFloat = 1.0
+    var lastOffset: CGSize = .zero
+    var lastRotation: Angle = .zero
+    var lastScale: CGFloat = 1.0
+    var globalPosition: CGPoint = .zero
+}
+
 // MARK: - Composite Models (for UI convenience)
 
 struct CollageSession: Identifiable {

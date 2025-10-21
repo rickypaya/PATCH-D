@@ -1,10 +1,3 @@
-//
-//  MembersListView.swift
-//  PATCH'D
-//
-//  Created by Ricardo Payares on 10/15/25.
-//
-
 import SwiftUI
 
 //MARK: - Members List View
@@ -32,16 +25,22 @@ struct MembersListView: View {
                                                 .frame(width: 50, height: 50)
                                                 .clipShape(Circle())
                                         case .failure(_), .empty:
-                                            defaultMemberAvatar(for: member)
-                                                .frame(width: 35, height: 35)
+                                            Image(systemName: "person.circle.fill")
+                                                .resizable()
+                                                .foregroundColor(.gray)
+                                                .frame(width: 50, height: 50)
                                         @unknown default:
-                                            defaultMemberAvatar(for: member)
-                                                .frame(width: 35, height: 35)
+                                            Image(systemName: "person.circle.fill")
+                                                .resizable()
+                                                .foregroundColor(.gray)
+                                                .frame(width: 50, height: 50)
                                         }
                                     }
                                 } else {
-                                    defaultMemberAvatar(for: member)
-                                        .frame(width: 35, height: 35)
+                                    Image(systemName: "person.circle.fill")
+                                        .resizable()
+                                        .foregroundColor(.gray)
+                                        .frame(width: 50, height: 50)
                                 }
                                 
                                 // Username

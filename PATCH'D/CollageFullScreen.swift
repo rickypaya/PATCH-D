@@ -20,6 +20,9 @@ struct CollageFullscreenView: View {
     @State private var trashIconFrame: CGRect = .zero
     @State private var isOverTrash = false
     @State private var clearToolbar = false
+    @State private var showMenuDropdown = false
+    @State private var showCopyAlert = false
+    @State private var showMembersList = false
 
     struct PhotoState {
         var offset: CGSize = .zero
@@ -60,6 +63,11 @@ struct CollageFullscreenView: View {
                 .onAppear {
                     canvasSize = geometry.size
                 }
+                .onTapGesture(count: 2) {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        clearToolbar.toggle()
+                    }
+                }
             }
         }
         .overlay(
@@ -84,7 +92,13 @@ struct CollageFullscreenView: View {
                                 dismiss()
                             }
                         },
-                        onCopyCode: { UIPasteboard.general.string = session.inviteCode   },
+                        onCopyCode: {
+                            UIPasteboard.general.string = session.inviteCode
+                            showCopyAlert = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                showCopyAlert = false
+                            }
+                        },
                         onAddSticker: { showStickerLibrary = true },
                         onPaste: {
                             Task {
@@ -92,6 +106,7 @@ struct CollageFullscreenView: View {
                             }
                         },
                         onAddPhoto: { showImageSourcePicker = true },
+                        showMenuDropdown: $showMenuDropdown,
                         clearToolbar: clearToolbar
                     )
                 }
@@ -108,12 +123,21 @@ struct CollageFullscreenView: View {
                         onTrashFrameChange: { frame in
                             trashIconFrame = frame
                         },
+                        onMembersPressed: { showMembersList = true },
                         clearToolbar: clearToolbar
                     )
                 }
             },
             alignment: .bottom
         )
+        .overlay(alignment: .top) {
+            if showCopyAlert {
+                CopyAlertView()
+                    .padding(.top, 100)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .animation(.easeInOut, value: showCopyAlert)
+            }
+        }
         .ignoresSafeArea(.all)
         .navigationBarHidden(true)
         .onAppear {
@@ -137,6 +161,9 @@ struct CollageFullscreenView: View {
         }
         .sheet(isPresented: $showCamera) {
             ImagePicker(image: $selectedImage, sourceType: .camera)
+        }
+        .onChange(of: appState.photoUpdates.count) { _, _ in
+            updatePhotoState()
         }
         .onChange(of: appState.collagePhotos.count) { _, _ in
             // Initialize photo states for any new photos
@@ -164,6 +191,9 @@ struct CollageFullscreenView: View {
             Button("OK", role: .cancel) { pasteErrorMessage = nil }
         } message: {
             Text(pasteErrorMessage ?? "")
+        }
+        .sheet(isPresented: $showMembersList) {
+            MembersListView(members: appState.collageMembers)
         }
     }
     
@@ -199,6 +229,23 @@ struct CollageFullscreenView: View {
                 )
             }
         }
+    }
+    
+    private func updatePhotoState() {
+        guard let uuid = appState.photoUpdates.popLast() else { return }
+        
+        guard let photo = appState.collagePhotos.filter({$0.id == uuid}).first else {
+            photoStates[uuid] = nil
+            return
+        }
+        
+        guard var state = photoStates[uuid] else { return }
+        
+        state.globalPosition = CGPoint(x: CGFloat(photo.position_x), y: CGFloat(photo.position_y))
+        state.rotation = Angle(degrees: photo.rotation)
+        state.scale = photo.scale
+        
+        photoStates[uuid] = state
     }
     
     private func addPhotoToCanvas(image: UIImage, in viewSize: CGSize) {
@@ -338,6 +385,22 @@ struct CollageFullscreenView: View {
     }
 }
 
+// MARK: - Copy Alert View
+struct CopyAlertView: View {
+    var body: some View {
+        HStack {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+            Text("Invite code copied!")
+                .foregroundColor(.white)
+                .font(.subheadline)
+        }
+        .padding()
+        .background(Color.black.opacity(0.8))
+        .cornerRadius(10)
+    }
+}
+
 // MARK: - Top Toolbar View
 struct TopToolbarView: View {
     let onClose: () -> Void
@@ -345,6 +408,7 @@ struct TopToolbarView: View {
     let onAddSticker: () -> Void
     let onPaste: () -> Void
     let onAddPhoto: () -> Void
+    @Binding var showMenuDropdown: Bool
     let clearToolbar: Bool
     
     var body: some View {
@@ -362,41 +426,25 @@ struct TopToolbarView: View {
                 
                 Spacer()
                 
-                // Add Sticker Button
-                Button(action: onAddSticker) {
-                    Image("stickerIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 24, height: 24)
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(Color.purple.opacity(0.8))
-                        .clipShape(Circle())
-                }
-                
-                //Copy Invite Button
-                Button(action: onCopyCode) {
-                    Image(systemName: "document.on.document")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(Color.blue.opacity(0.8))
-                        .clipShape(Circle())
-                }
-                
-                // Paste Button
-                Button(action: onPaste) {
-                    Image(systemName: "doc.on.clipboard")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(Color.green.opacity(0.8))
-                        .clipShape(Circle())
-                }
-                
-                // Add Photo Button
-                Button(action: onAddPhoto) {
-                    Image(systemName: "plus")
+                // Menu Button
+                Menu {
+                    Button(action: onAddSticker) {
+                        Label("Add Sticker", systemImage: "face.smiling")
+                    }
+                    
+                    Button(action: onCopyCode) {
+                        Label("Copy Invite Code", systemImage: "document.on.document")
+                    }
+                    
+                    Button(action: onPaste) {
+                        Label("Paste", systemImage: "doc.on.clipboard")
+                    }
+                    
+                    Button(action: onAddPhoto) {
+                        Label("Add Photo", systemImage: "plus")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 40, height: 40)
@@ -416,38 +464,46 @@ struct BottomToolbarView: View {
     let members: [CollageUser]
     let isOverTrash: Bool
     let onTrashFrameChange: (CGRect) -> Void
+    let onMembersPressed: () -> Void
     let clearToolbar: Bool
     
     var body: some View {
         HStack(alignment: .bottom) {
-            // Active Members List
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(members) { member in
-                        VStack(spacing: 4) {
-                            AsyncImage(url: URL(string: member.avatarUrl ?? "")) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            } placeholder: {
-                                Image(systemName: "person.circle.fill")
-                                    .resizable()
-                                    .foregroundColor(.gray)
-                            }
-                            .frame(width: 40, height: 40)
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                            
-                            Text(member.username)
-                                .font(.caption2)
-                                .foregroundColor(.white)
-                                .lineLimit(1)
+            // Active Members Preview (limited to 3)
+            Button(action: onMembersPressed) {
+                HStack(spacing: -8) {
+                    ForEach(members.prefix(3)) { member in
+                        AsyncImage(url: URL(string: member.avatarUrl ?? "")) { image in
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        } placeholder: {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .foregroundColor(.gray)
                         }
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
+                    }
+                    
+                    // Show count if more than 3 members
+                    if members.count > 3 {
+                        ZStack {
+                            Circle()
+                                .fill(Color.blue.opacity(0.8))
+                                .frame(width: 40, height: 40)
+                            
+                            Text("+\(members.count - 3)")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                        }
+                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
                     }
                 }
                 .padding(.horizontal, 16)
             }
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.7)
             
             Spacer()
             
