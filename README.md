@@ -1,14 +1,17 @@
 # PATCH'D  - Overview
-Patched is a real-time collaborative photo and media collaging application made for iPhone
-With an email login, a user can easily begin creating and sharing collages with friends to join in on the fun.
-Collages can be made from photos taken with the camera, from the library, or cutouts from photos
+Patched is a mobile-first social application that reimagines digital collage-making as a playful, real-time, and collaborative creative experience. Designed for iPhone, Patched enables users to co-create visual compositions using photos, videos, and media cutouts with friends — transforming a traditionally solo creative act into a shared, dynamic, and interactive process.
 
-Goals:
-- Real-time, intuitive photo collaging features that encourage users to take more photos and use copy photo cutouts.
-- Social Features for users to easily invite friends and share collages with recent favorites
-- Robust mobile application and attractive design
+At its core, Patched combines computational visual design, social interaction, and real-time collaboration. Users can start by signing in with their email to instantly create or join collage “sessions.” Each session acts as a shared creative canvas, where participants can contribute visual elements — from freshly captured photos to library images or precise cutouts extracted from photos using iOS’s built-in subject isolation tools.
 
-MVP 1 - 10/16 Beta
+## Key Features
+- Real-Time Collaboration: Multiple users can work simultaneously on the same collage. Each addition, movement, or transformation is synchronized in real-time, creating a sense of presence and shared creativity.
+- Media Cutouts and Layering: Users can import visual assets as cutouts, leveraging native iOS clipboard and visual lookup tools. These elements can be freely arranged, layered, and resized to form intricate visual narratives.
+- Dynamic Canvas: The collage canvas updates instantly as participants move, rotate, and scale images, making the process feel like a living, breathing artwork that evolves with every gesture.
+- Thematic Collage Sessions: Each session can be guided by a prompt or theme (e.g., “Weekend Memories,” “Moodboard for a Short Film,” “Dream Cityscape”) — fostering structured creativity and communal storytelling.
+- Time-Bound Collaboration: Collages can be ephemeral, with countdown timers or expiration windows that encourage spontaneous creation and participation — blending the immediacy of social media with the depth of artistic co-creation.
+- Instant Sharing & Archiving: Once a collage is complete or the session expires, users can export their creations or share them directly to social platforms, celebrating collective visual expression.
+
+### MVP 1 - 10/16 Beta
 - Prototype application and database setup
 Features:
 - signup, logging in
@@ -30,7 +33,7 @@ Features:
   - Pinch - Scale
   - Rotate - scale (NF)
  
-MVP 2 Goals: 
+### MVP 2 Goals: 
 - "Active Users" real-time data
 - Smooth collaging experience
 - App aesthetics, branding
@@ -38,225 +41,43 @@ MVP 2 Goals:
 - Archive for viewing expired collages
 - Friends list
 
-Stretch Goals:
+### Stretch Goals:
 - Widget for viewing the archive
 
-# PATCH'D - Project Division
-
 ## Oct 16th Meeting Tasks
-- [ ]  Onboarding (Sign up & Sign in flow) - UI design Yvette Code @Janice
-   - [ ]    Include validation messages
-- [ ] Create a Collage @Janice
-   - [ ]        Custom theme name
-   - [ ]        Collage Duration / Expiration
+- [x]  Onboarding (Sign up & Sign in flow) - UI design Yvette Code @Janice
+   - [x]    Include validation messages
+- [x] Create a Collage @Janice
+   - [x]        Custom theme name
+   - [x]        Collage Duration / Expiration
 - [ ] Canvas View
-   - [ ]        Remove the layer of Canvas Detail view Ricky
-   - [ ]            Go straight to the Canvas from Collages
-   - [ ]        Collaborators icon Ricky
-   - [ ]            Add collaborators on bottom corner of canvas to see who’s collaborating on that collage
-   - [ ]        Add collaborator’s icon on the corner of the image to show who’s moving the image
-   - [ ]        Image movement Ricky
-   - [ ]            Positioning (Local vs Global) - fix
-   - [ ]            Rotate image around
-   - [ ]        Trash bin icon Ricky
-   - [ ]        Sticker png (transparent BG correction)
+   - [x]        Remove the layer of Canvas Detail view Ricky
+   - [x]            Go straight to the Canvas from Collages
+   - [x]        Collaborators icon Ricky
+   - [x]            Add collaborators on bottom corner of canvas to see who’s collaborating on that collage
+   - [x]        Add collaborator’s icon on the corner of the image to show who’s moving the image
+   - [x]        Image movement Ricky
+   - [x]            Positioning (Local vs Global) - fix
+   - [x]            Rotate image around
+   - [x]        Trash bin icon Ricky
+   - [x]        Sticker png (transparent BG correction)
 - [ ] Invite Friends Page or Friends list - UI design Yvette Code @Janice
 - [ ] Download & Share collage flow
 - [ ] Add transitions / animations between screens — low priority
 
 ## Oct 14th Meeting Tasks
-- [ ] realtime dashboard - med
-- [ ] implement collaging - Camera/Library add, paste from photos app, add stickers from library - high
-- [ ] populate stickers bucket, add stickers library to collage - high
-- [ ] photo gestures (moving, scaling, rotating) - high
-- [ ] realtime countdown - low
-- [ ] Auto auth, remember me, reset password, confirm email - med
-- [ ] Archive view (Expired collages) - med
-- [ ] finished collage view (save, share button) - med
+- [x] realtime dashboard - med
+- [x] implement collaging - Camera/Library add, paste from photos app, add stickers from library - high
+- [x] populate stickers bucket, add stickers library to collage - high
+- [x] photo gestures (moving, scaling, rotating) - high
+- [x] realtime countdown - low
+- [x] Auto auth, remember me, reset password, confirm email - med
+- [x] Archive view (Expired collages) - med
+- [x] finished collage view (save, share button) - med
 
 ### Hail Mary
 - [ ] Homescreen widget with Archived Collages (?)
       
 
-### File 1: **Models.swift**
-**Purpose:** All data models and structures for the application
-
-**Contains:**
-- `User` model
-- `CollageSession` model  
-- `CollagePhoto` model
-- `Theme` model
-- `Invite` model
-- `Collage` model (with Codable/Decodable)
-- Helper extensions and enums
-
----
-
-### File 2: **DatabaseManager.swift**
-**Purpose:** All Supabase database operations and API calls
-
-**Contains:**
-- `SupabaseManager` class (client setup, auth)
-- `CollageDBManager` class (CRUD operations)
-- Authentication methods
-- Collage CRUD operations
-- Photo metadata storage
-- Real-time subscriptions setup
-- Invite code generation/validation
-
----
-
-### File 3: **PhotoManager.swift**
-**Purpose:** Camera, image processing, and photo placement logic
-
-**Contains:**
-- `CameraManager` class
-- `PhotoProcessor` class (cropping, compression)
-- `CollageLayoutManager` class (position calculation, collision detection)
-- Camera capture view controller wrapper
-- Image upload to Supabase Storage
-- Random crop logic
-- Photo positioning algorithms
-
----
-
-### File 4: **AppState.swift + Views**
-**Purpose:** Application state management and all SwiftUI views
-
-**Contains:**
-- `AppState` class (ObservableObject)
-- `ContentView` (root navigation)
-- `AuthenticationView`
-- `DashboardView`
-- `CollageView`
-- `JoinCollageView`
-- `CameraView`
-- `ProfileView` (optional)
-- `SettingsView` (optional)
-
----
-## Table Relations
-| Table                  | Purpose                                                          |
-| ---------------------- | ---------------------------------------------------------------- |
-| `users`                | Stores registered user accounts (linked to Supabase Auth).       |
-| `collages`             | Represents a collage session (with theme, start/end time, etc.). |
-| `collage_members`      | Many-to-many relation between users and collages.                |
-| `photos`               | Stores uploaded photos placed within a collage.                  |
-| `themes`               | A pool of random themes fetched when a new collage is created.   |
-| `invites` *(optional)* | Stores shareable invite codes to join a collage.                 |
-
- Supabase storage buckets for photo uploads
-| Bucket           | Path Example                            | Access                           |
-| ---------------- | --------------------------------------- | -------------------------------- |
-| `collage-photos` | `/collages/{collage_id}/{photo_id}.jpg` | Public read, authenticated write |
-
----
-
-## 📱 Supabase Database Schema Reminder
-
-### Tables to Create:
-- `users` (id, email, username, created_at, avatar_url)
-- `collages` (id, theme, created_by, starts_at, expires_at, invite_code)
-- `collage_members` (collage_id, user_id, joined_at)
-- `photos` (id, collage_id, user_id, storage_path, position_x, position_y, width, height, rotation, uploaded_at)
-- `themes` (id, text, category, is_active)
-
-### Storage Buckets:
-- `collage-photos` (public read, authenticated write)
-- `avatars` (public read, user write own)
-
----
-
-## 🚀 Success Criteria
-
-By end of Week 2, the app should:
-- ✅ Allow users to sign up/sign in
-- ✅ Create a collage with random theme and timer
-- ✅ Take photo, randomly crop, and upload
-- ✅ Display own photos clearly, others' photos blurred
-- ✅ Join existing collages via invite code
-- ✅ Show all photos unblurred when timer expires
-- ✅ Handle multiple active collages per user
-- ✅ Work reliably with real-time updates
-- ✅ Have polished UI with smooth animations
-- ✅ Handle errors gracefully
-
---
-## App State Functions for use in UI (To Be implemented)
-
-## AUTHENTICATION 
-### Core Auth
-
-signUpWithEmail(email:password:username:) - Create new account + collage_users entry
-
-signInWithEmail(email:password:) - Login existing user
-
-signOut() - Logout and clear state
-
-isUserAuthenticated() - Check if user has active session
-
-getCurrentUserProfile() - Get logged-in user's CollageUser profile
 
 
-## COLLAGE MANAGEMENT
-### Create Collage
-
-fetchRandomTheme() - Get one random theme from DB
-
-createNewCollage(duration:) - Create collage with random theme
-
-storeActiveCollageId(collageId:) - Save current collage to app state
-
-### Join Collage
-
-joinCollageWithCode(inviteCode:) - Join by invite code
-
-validateInviteCode(code:) - Basic format check (8 characters)
-
-### View Collages
-
-loadUserActiveCollages() - Fetch all user's active collages
-
-loadCollageDetails(collageId:) - Fetch full collage with photos/members
-
-getTimeRemaining(collageId:) - Calculate time until expiry
-
-copyInviteCodeToClipboard(inviteCode:) - Share functionality
-
-
-## PHOTO MANAGEMENT
-### Upload Photos
-
-openImagePicker() - Show system photo picker
-
-selectPhotoFromLibrary(image:) - Handle selected image
-
-uploadPhotoToCollage(collageId:image:) - Upload with default position/size
-
-handleUploadError(error:) - Show error message
-
-### Display Photos
-
-loadPhotosForCollage(collageId:) - Fetch all photos for display
-
-refreshCollagePhotos(collageId:) - Pull-to-refresh photos
-
-
-## ERROR HANDLING 
-### Basic Error Management
-
-handleNetworkError(error:) - No internet message
-
-handleAuthError(error:) - Login/signup errors
-
-showErrorAlert(message:) - Generic error display
-
-
-## UI STATE
-### Navigation & Display
-
-navigateToCollage(collageId:) - Navigate to collage detail
-
-showLoadingIndicator() - Show/hide loading states
-
-refreshView() - Pull-to-refresh functionality
