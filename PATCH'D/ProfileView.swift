@@ -83,7 +83,7 @@ struct ProfileView: View {
         HStack {
             // Profile icon (left)
             Button(action: {
-                // Already in profile, could navigate to settings or stay
+                appState.currentState = .homeScreen
             }) {
                 Circle()
                     .fill(Color.yellow)
