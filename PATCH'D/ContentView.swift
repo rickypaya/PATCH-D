@@ -41,22 +41,59 @@ func defaultMemberAvatar(for member: CollageUser) -> some View {
         )
 }
 
+//MARK: - Info Row Component
+struct InfoRow: View {
+    let label: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(label)
+                .foregroundColor(.gray)
+            Spacer()
+            Text(value)
+                .foregroundColor(.white)
+                .fontWeight(.medium)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 //MARK: - Main Content Flow Controller
 struct ContentView: View {
     @StateObject private var appState = AppState.shared
     
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
             switch appState.currentState {
-            case .signUp:
-                SignUpView()
-            case .logIn:
-                LogInView()
+            case .onboardingTitle:
+                OnboardingTitleView()
+            case .onboardingWelcome:
+                OnboardingWelcome_SignUporLogInView()
+            case .onboardingSignUp:
+                OnboardingSignUpView()
+            case .onboardingSignIn:
+                OnboardingSignInView()
+            case .registrationSuccess:
+                RegistrationSuccessView()
+            case .onboarding1:
+                Onboarding1View()
+            case .onboarding2:
+                Onboarding2View()
+            case .onboarding3:
+                Onboarding3View()
+            case .onboarding4:
+                Onboarding4View()
+            case .homeScreen:
+                HomeScreenView()
+            case .homeCollageCarousel:
+                HomeScreenView()
+            case .createCollage:
+                CreateCollageView()
             case .profile:
                 ProfileView()
             case .dashboard:
-                DashboardView()
+                HomeScreenView()
             case .fullscreen:
                 CollageFullscreenView(session: appState.selectedSession!)
             }

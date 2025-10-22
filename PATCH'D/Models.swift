@@ -5,11 +5,46 @@
 
 import SwiftUI
 
+// MARK: - Authentication Models
+
+enum AuthError: Error, LocalizedError {
+    case userAlreadyRegistered
+    case invalidCredentials
+    case userNotFound
+    case networkError
+    case unknownError
+    
+    var errorDescription: String? {
+        switch self {
+        case .userAlreadyRegistered:
+            return "This email is already registered"
+        case .invalidCredentials:
+            return "Invalid login credentials"
+        case .userNotFound:
+            return "User not found"
+        case .networkError:
+            return "Network error occurred"
+        case .unknownError:
+            return "An unknown error occurred"
+        }
+    }
+}
+
 // MARK: - User Models
 
 enum CurrState {
-    case signUp
-    case logIn
+    case onboardingTitle
+    case onboardingWelcome
+    case onboardingSignUp
+    case onboardingSignIn
+    case registrationSuccess
+    case onboarding1
+    case onboarding2
+    case onboarding3
+    case onboarding4
+    case homeScreen
+    case homeCollageCarousel
+    case createCollage
     case profile
     case dashboard
     case fullscreen

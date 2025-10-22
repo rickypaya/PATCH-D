@@ -26,7 +26,7 @@ struct ArchiveSheet: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(appState.archive) { session in
-                            CollagePreviewCard(session: session)
+                            RealCollagePreviewCard(session: session)
                         }
                     }
                     .padding()

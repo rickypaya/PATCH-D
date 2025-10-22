@@ -8,7 +8,7 @@ class AppState: ObservableObject {
     
     //MARK: - App State Variables
     
-    @Published var currentState: CurrState = .dashboard
+    @Published var currentState: CurrState = .onboardingTitle
     @Published var isAuthenticated = false
     @Published var currentUser: CollageUser?
     @Published var collageMemberships: [UUID] = []
@@ -35,6 +35,14 @@ class AppState: ObservableObject {
     private let dbManager = CollageDBManager.shared
     
     private init() {
+        // Skip authentication check in preview mode
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1" {
+            currentState = .onboardingTitle
+            return
+        }
+        #endif
+        
         Task {
             isLoading = true
             await loadCurrentUser()
@@ -43,6 +51,13 @@ class AppState: ObservableObject {
             
             // Auto-cleanup expired collages in background
             autoCleanupExpiredCollages()
+            
+            // Only go to dashboard if user is authenticated, otherwise start onboarding
+            if isAuthenticated {
+                currentState = .dashboard
+            } else {
+                currentState = .onboardingTitle
+            }
             isLoading = false
         }
     }
@@ -53,7 +68,8 @@ class AppState: ObservableObject {
             isAuthenticated = true
         } catch {
             errorMessage = "Failed to load user: \(error.localizedDescription)"
-            currentState = .signUp
+            // Don't automatically navigate to onboardingWelcome here
+            // Let the calling function decide the navigation
             isAuthenticated = false
         }
     }
@@ -185,7 +201,16 @@ class AppState: ObservableObject {
         do {
             let authResp = try await dbManager.signUpWithEmail(email: email, password: password)
             try await dbManager.updateUsername(username: username)
-            currentState = .logIn
+            
+            // Load the current user to set authentication state
+            await loadCurrentUser()
+            
+            // Check if user was successfully loaded
+            guard isAuthenticated && currentUser != nil else {
+                throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "Failed to load user after sign up"])
+            }
+            
+            currentState = .registrationSuccess
         } catch {
             errorMessage = error.localizedDescription
             throw error
@@ -203,12 +228,16 @@ class AppState: ObservableObject {
             try await dbManager.signIn(email: email, password: password)
             
             await loadCurrentUser()
-            await fetchMemberships()
-            isAuthenticated = true
             
+            // Check if user was successfully loaded
+            guard isAuthenticated && currentUser != nil else {
+                throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "Failed to load user after sign in"])
+            }
+            
+            await fetchMemberships()
             await loadCollageSessions()
             
-            currentState = .dashboard
+            currentState = .homeCollageCarousel
         } catch {
             errorMessage = error.localizedDescription
             throw error
@@ -222,7 +251,7 @@ class AppState: ObservableObject {
         errorMessage = nil
         
         do {
-            currentState = .logIn
+            currentState = .onboardingWelcome
             try await dbManager.signOut()
             
             // Clear state and caches
