@@ -5,6 +5,7 @@
 import SwiftUI
 import Supabase
 import avif
+import Photos
 
 //MARK: - Collage DB Manager
 
@@ -1398,5 +1399,55 @@ class CollageDBManager {
             .value
         
         return results.first
+    }
+    
+    //MARK: - Download Functions
+
+    /// Download an image from a URL and save to Photos library
+    func downloadImage(from urlString: String) async throws {
+        guard let url = URL(string: urlString) else {
+            throw NSError(domain: "DBManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
+        }
+        
+        // Download the image data
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw NSError(domain: "DBManager", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to download image"])
+        }
+        
+        guard let image = UIImage(data: data) else {
+            throw NSError(domain: "DBManager", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"])
+        }
+        
+        // Request photo library permission
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        
+        guard status == .authorized else {
+            throw NSError(domain: "DBManager", code: 403, userInfo: [NSLocalizedDescriptionKey: "Photo library access denied"])
+        }
+        
+        // Save to photo library
+        try await PHPhotoLibrary.shared().performChanges {
+            PHAssetChangeRequest.creationRequestForAsset(from: image)
+        }
+    }
+
+    /// Download collage preview image
+    func downloadCollagePreview(sessionId: UUID) async throws {
+        let collage: Collage = try await supabase
+            .from("collages")
+            .select()
+            .eq("id", value: sessionId.uuidString)
+            .single()
+            .execute()
+            .value
+        
+        guard let previewUrl = collage.previewUrl, !previewUrl.isEmpty else {
+            throw NSError(domain: "DBManager", code: 404, userInfo: [NSLocalizedDescriptionKey: "No preview image available"])
+        }
+        
+        try await downloadImage(from: previewUrl)
     }
 }

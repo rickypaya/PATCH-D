@@ -296,6 +296,7 @@ struct ProfileView: View {
 
 // MARK: - Profile Collage Preview Card (Real Data)
 struct ProfileCollagePreviewCard: View {
+    @EnvironmentObject var appState: AppState
     let session: CollageSession
     @State var preview_url: String?
     
@@ -357,6 +358,10 @@ struct ProfileCollagePreviewCard: View {
         }
         .onAppear {
             preview_url = session.preview_url ?? ""
+        }
+        .onTapGesture {
+            appState.selectedSession = session
+            appState.currentState = .final
         }
     }
     

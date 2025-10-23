@@ -100,6 +100,8 @@ struct ContentView: View {
                 FriendsListView()
             case .collageInvites:
                 CollageInvitesListView()
+            case .final:
+                FinalCollageView(session: appState.selectedSession!)
             }
         }
         .animation(.easeIn, value: appState.currentState)

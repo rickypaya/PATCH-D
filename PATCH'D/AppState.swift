@@ -1240,6 +1240,42 @@ class AppState: ObservableObject {
             throw error
         }
     }
+    
+    // MARK: - Download Functions
+
+    /// Download the collage preview to Photos library
+    func downloadCollagePreview(session: CollageSession) async throws {
+        guard let previewUrl = session.collage.previewUrl, !previewUrl.isEmpty else {
+            throw NSError(domain: "AppState", code: 404, userInfo: [NSLocalizedDescriptionKey: "No preview image available for this collage"])
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await dbManager.downloadCollagePreview(sessionId: session.id)
+            isLoading = false
+        } catch {
+            isLoading = false
+            errorMessage = "Failed to download collage: \(error.localizedDescription)"
+            throw error
+        }
+    }
+
+    /// Download any image URL to Photos library
+    func downloadImage(from urlString: String) async throws {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await dbManager.downloadImage(from: urlString)
+            isLoading = false
+        } catch {
+            isLoading = false
+            errorMessage = "Failed to download image: \(error.localizedDescription)"
+            throw error
+        }
+    }
 }
 
 // MARK: - Preview Helpers

@@ -50,6 +50,7 @@ enum CurrState {
     case fullscreen
     case friendsList
     case collageInvites
+    case final
 }
 
 struct CollageUser: Identifiable, Codable {
