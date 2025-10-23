@@ -142,6 +142,10 @@ struct ProfileView: View {
                 .italic()
                 .foregroundColor(.black)
             
+            Text(appState.currentUser!.email.isEmpty ? "Jericho" : appState.currentUser!.email)
+                .font(.custom("Sanchez", size: 14))
+                .foregroundColor(.black)
+            
             // Statistics
             HStack(spacing: 40) {
                 // Collages count

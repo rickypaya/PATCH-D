@@ -38,8 +38,7 @@ struct CollageFullscreenView: View {
         GeometryReader { geometry in
             // Main Canvas Layer
             ZStack {
-                Color.gray.opacity(0.2)
-                    .ignoresSafeArea()
+                Color(red: 0.933, green: 0.867, blue: 0.757).ignoresSafeArea()
                 
                 // Collage Canvas
                 ZStack {

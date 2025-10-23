@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		9C15F1752EAA716600A1B13E /* avif in Frameworks */ = {isa = PBXBuildFile; productRef = 9C15F1742EAA716600A1B13E /* avif */; };
 		9CB7FA7B2E95F99900ADAEB7 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 9CB7FA7A2E95F99900ADAEB7 /* Auth */; };
 		9CB7FA7D2E95F99900ADAEB7 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = 9CB7FA7C2E95F99900ADAEB7 /* Functions */; };
 		9CB7FA7F2E95F99900ADAEB7 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 9CB7FA7E2E95F99900ADAEB7 /* PostgREST */; };
@@ -61,6 +62,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				9C15F1752EAA716600A1B13E /* avif in Frameworks */,
 				9CB7FA7F2E95F99900ADAEB7 /* PostgREST in Frameworks */,
 				9CB7FA7D2E95F99900ADAEB7 /* Functions in Frameworks */,
 				9CB7FA852E95FBB100ADAEB7 /* Supabase in Frameworks */,
@@ -133,6 +135,7 @@
 				9CB7FA802E95F99900ADAEB7 /* Realtime */,
 				9CB7FA822E95F99900ADAEB7 /* Storage */,
 				9CB7FA842E95FBB100ADAEB7 /* Supabase */,
+				9C15F1742EAA716600A1B13E /* avif */,
 			);
 			productName = "PATCH'D";
 			productReference = 9CB7FA412E8F79AA00ADAEB7 /* PATCH'D.app */;
@@ -218,6 +221,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				9CB7FA792E95F99900ADAEB7 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				9C15F1732EAA716600A1B13E /* XCRemoteSwiftPackageReference "avif.swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9CB7FA422E8F79AA00ADAEB7 /* Products */;
@@ -619,6 +623,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		9C15F1732EAA716600A1B13E /* XCRemoteSwiftPackageReference "avif.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/awxkee/avif.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.1.1;
+			};
+		};
 		9CB7FA792E95F99900ADAEB7 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/supabase-community/supabase-swift.git";
@@ -630,6 +642,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		9C15F1742EAA716600A1B13E /* avif */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9C15F1732EAA716600A1B13E /* XCRemoteSwiftPackageReference "avif.swift" */;
+			productName = avif;
+		};
 		9CB7FA7A2E95F99900ADAEB7 /* Auth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 9CB7FA792E95F99900ADAEB7 /* XCRemoteSwiftPackageReference "supabase-swift" */;
