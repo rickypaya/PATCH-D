@@ -32,6 +32,11 @@ struct ProfileView: View {
         appState.archive
     }
     
+    private var userEmail: String {
+        guard let user = appState.currentUser else { return "Unknown User" }
+        return user.email
+    }
+    
     // Total unique members across all user's contributed collages
     private var totalUniqueMembers: Int {
         let allMembers = userContributedCollages.flatMap { $0.members }
@@ -142,7 +147,7 @@ struct ProfileView: View {
                 .italic()
                 .foregroundColor(.black)
             
-            Text(appState.currentUser!.email.isEmpty ? "Jericho" : appState.currentUser!.email)
+            Text(userEmail)
                 .font(.custom("Sanchez", size: 14))
                 .foregroundColor(.black)
             
