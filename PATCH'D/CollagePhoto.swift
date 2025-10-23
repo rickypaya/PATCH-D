@@ -4,8 +4,9 @@ import SwiftUI
 struct CollagePhotoView: View {
     let photo: CollagePhoto
     let viewSize: CGSize
-    let state: CollageFullscreenView.PhotoState
+    let state: PhotoState
     let isBlurred: Bool
+    let isExpired: Bool
     let onDragChanged: (DragGesture.Value) -> Void
     let onDragEnded: (DragGesture.Value) -> Void
     let onMagnifyChanged: (MagnificationGesture.Value) -> Void
@@ -19,9 +20,9 @@ struct CollagePhotoView: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 150, height: 150)
-                .blur(radius: isBlurred ? 20 : 0)
+                .blur(radius: !isExpired && isBlurred ? 20 : 0)
                 .overlay(
-                    isBlurred ?
+                    isBlurred && !isExpired ?
                     Image(systemName: "lock.fill")
                         .font(.largeTitle)
                         .foregroundColor(.white.opacity(0.8))
@@ -31,6 +32,7 @@ struct CollagePhotoView: View {
             ProgressView()
                 .frame(width: 150, height: 150)
         }
+        .animation(.easeInOut, value: isBlurred)
         .rotationEffect(state.rotation)
         .scaleEffect(state.scale)
         .offset(state.offset)

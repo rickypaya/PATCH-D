@@ -361,6 +361,18 @@ class AppState: ObservableObject {
         
     }
     
+    func captureExpiredSession(captureView: UIView?) async {
+        if let session = selectedSession, let view = captureView {
+            await captureAndUploadPreview(for: session, from: view)
+        }
+        
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        
+        currentState = .final
+        stopRealTimeSubscription()
+        collagePhotos = []
+    }
+    
     func loadPhotosForSelectedSession() async {
         guard let session = selectedSession else { return }
         
@@ -634,7 +646,7 @@ class AppState: ObservableObject {
     /// Load sent friend requests
     func loadSentFriendRequests() async {
         do {
-            let requests = try await dbManager.fetchFriendships(status: "pending")
+            let requests = try await dbManager.fetchSentRequests()
             sentFriendRequests = requests
         } catch {
             errorMessage = "Failed to load sent requests: \(error.localizedDescription)"

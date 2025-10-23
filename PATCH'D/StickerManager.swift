@@ -40,54 +40,47 @@ class StickerManager: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        do {
-            // Define category folders from your Supabase structure
-            let categoryFolders = [
-                ("Animals", "Stickers/Animals"),
-                ("Creative", "Stickers/Creative"),
-                ("Education", "Stickers/Education"),
-                ("Entertainment", "Stickers/Entertainment"),
-                ("Fitness", "Stickers/Fitness"),
-                ("Food", "Stickers/Food"),
-                ("Home", "Stickers/Home"),
-                ("Lifestyle", "Stickers/Lifestyle"),
-                ("Memories", "Stickers/Memories"),
-                ("Nature", "Stickers/Nature"),
-                ("Social", "Stickers/Social"),
-                ("Travel", "Stickers/Travel"),
-                ("Urban", "Stickers/Urban"),
-                ("General", "Stickers/_General")
-            ]
-            
-            var loadedCategories: [StickerCategory] = []
-            
-            for (name, folder) in categoryFolders {
-                do {
-                    let stickers = try await fetchStickersFromFolder(folder: folder, categoryName: name)
-                    if !stickers.isEmpty {
-                        var category = StickerCategory(name: name, folderName: folder)
-                        category.stickers = stickers
-                        loadedCategories.append(category)
-                    }
-                } catch {
-                    print("Failed to load category \(name): \(error)")
+        // Define category folders from your Supabase structure
+        let categoryFolders = [
+            ("Animals", "Stickers/Animals"),
+            ("Creative", "Stickers/Creative"),
+            ("Education", "Stickers/Education"),
+            ("Entertainment", "Stickers/Entertainment"),
+            ("Fitness", "Stickers/Fitness"),
+            ("Food", "Stickers/Food"),
+            ("Home", "Stickers/Home"),
+            ("Lifestyle", "Stickers/Lifestyle"),
+            ("Memories", "Stickers/Memories"),
+            ("Nature", "Stickers/Nature"),
+            ("Social", "Stickers/Social"),
+            ("Travel", "Stickers/Travel"),
+            ("Urban", "Stickers/Urban"),
+            ("General", "Stickers/_General")
+        ]
+        
+        var loadedCategories: [StickerCategory] = []
+        
+        for (name, folder) in categoryFolders {
+            do {
+                let stickers = try await fetchStickersFromFolder(folder: folder, categoryName: name)
+                if !stickers.isEmpty {
+                    var category = StickerCategory(name: name, folderName: folder)
+                    category.stickers = stickers
+                    loadedCategories.append(category)
                 }
+            } catch {
+                print("Failed to load category \(name): \(error)")
             }
-            
-            // Sort: General first, then alphabetically
-            loadedCategories.sort { cat1, cat2 in
-                if cat1.name == "General" { return true }
-                if cat2.name == "General" { return false }
-                return cat1.name < cat2.name
-            }
-            
-            categories = loadedCategories
-            
-        } catch {
-            errorMessage = "Failed to load stickers: \(error.localizedDescription)"
-            print(errorMessage ?? "")
         }
         
+        // Sort: General first, then alphabetically
+        loadedCategories.sort { cat1, cat2 in
+            if cat1.name == "General" { return true }
+            if cat2.name == "General" { return false }
+            return cat1.name < cat2.name
+        }
+        
+        categories = loadedCategories
         isLoading = false
     }
     

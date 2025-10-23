@@ -23,130 +23,143 @@ struct CollageFullscreenView: View {
     @State private var showMenuDropdown = false
     @State private var showCopyAlert = false
     @State private var showMembersList = false
+    @State private var isExpired = false
 
-    struct PhotoState {
-        var offset: CGSize = .zero
-        var rotation: Angle = .zero
-        var scale: CGFloat = 1.0
-        var lastOffset: CGSize = .zero
-        var lastRotation: Angle = .zero
-        var lastScale: CGFloat = 1.0
-        var globalPosition: CGPoint = .zero
+    
+    
+    private var canvasBackground: some View {
+        LinearGradient(
+            gradient: Gradient(colors: [
+                Color.white,
+                Color(red: 1.0, green: 0.98, blue: 0.9),
+                Color(red: 1.0, green: 0.95, blue: 0.85)
+            ]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
     }
+    
+    private func collagePhotosView(_ geometry: GeometryProxy) -> some View {
+        // Collage Canvas
+        ZStack {
+            ForEach(appState.collagePhotos) { photo in
+                CollagePhotoView(
+                    photo: photo,
+                    viewSize: geometry.size,
+                    state: photoStates[photo.id] ?? PhotoState(),
+                    isBlurred: session.collage.isPartyMode && photo.user_id != appState.currentUser?.id,
+                    isExpired: isExpired,
+                    onDragChanged: { value in handleDragChanged(photo: photo, value: value, in: geometry) },
+                    onDragEnded: { value in handleDragEnded(photo: photo, value: value, in: geometry) },
+                    onMagnifyChanged: { value in handleMagnifyChanged(photo: photo, value: value) },
+                    onMagnifyEnded: { _ in handleMagnifyEnded(photo: photo, in: geometry) },
+                    onRotationChanged: { value in handleRotationChanged(photo: photo, value: value) },
+                    onRotationEnded: { _ in handleRotationEnded(photo: photo, in: geometry) }
+                )
+            }
+        }
+       
+    }
+    
+    // MARK: - Overlays
+
+   private var topToolbarOverlay: some View {
+       Group {
+           if !clearToolbar && !isExpired {
+               TopToolbarView(
+                   onClose: handleClose,
+                   onCopyCode: handleCopyCode,
+                   onAddSticker: { showStickerLibrary = true },
+                   onPaste: { Task { await handlePasteAction(in: canvasSize) } },
+                   onAddPhoto: { showImageSourcePicker = true },
+                   showMenuDropdown: $showMenuDropdown,
+                   clearToolbar: clearToolbar,
+                   session: session,
+                   expirationDate: session.expiresAt,
+                   isExpired: $isExpired
+               )
+           }
+       }
+   }
+
+   private var bottomToolbarOverlay: some View {
+       Group {
+           if !clearToolbar && !isExpired {
+               BottomToolbarView(
+                   members: appState.collageMembers,
+                   isOverTrash: isOverTrash,
+                   onTrashFrameChange: { frame in trashIconFrame = frame },
+                   onMembersPressed: { showMembersList = true },
+                   clearToolbar: clearToolbar
+               )
+           }
+       }
+   }
+
+   private var copyAlertOverlay: some View {
+       Group {
+           if showCopyAlert {
+               CopyAlertView()
+                   .padding(.top, 100)
+                   .transition(.move(edge: .top).combined(with: .opacity))
+                   .animation(.easeInOut, value: showCopyAlert)
+           }
+       }
+   }
+
+    // MARK: - Lifecycle
+
+    private func onAppear() {
+        initializePhotoStates()
+        Task { await appState.loadCollageMembersForSession(collage_id: session.id) }
+    }
+
+    // MARK: - Toolbar Actions
+
+    private func handleClose() {
+        Task {
+            clearToolbar = true
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first,
+               let rootView = window.rootViewController?.view {
+                await appState.deselectCollageSession(captureView: rootView)
+            }
+            dismiss()
+        }
+    }
+
+    private func handleCopyCode() {
+        UIPasteboard.general.string = session.inviteCode
+        showCopyAlert = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            showCopyAlert = false
+        }
+    }
+
     
     var body: some View {
         GeometryReader { geometry in
-            // Main Canvas Layer
             ZStack {
-                Color(red: 0.933, green: 0.867, blue: 0.757).ignoresSafeArea()
-                
-                // Collage Canvas
-                ZStack {
-                    ForEach(appState.collagePhotos) { photo in
-                        CollagePhotoView(
-                            photo: photo,
-                            viewSize: geometry.size,
-                            state: photoStates[photo.id] ?? PhotoState(),
-                            isBlurred: session.collage.isPartyMode && photo.user_id != appState.currentUser?.id,
-                            onDragChanged: { value in handleDragChanged(photo: photo, value: value, in: geometry) },
-                            onDragEnded: { value in handleDragEnded(photo: photo, value: value, in: geometry) },
-                            onMagnifyChanged: { value in handleMagnifyChanged(photo: photo, value: value) },
-                            onMagnifyEnded: { _ in handleMagnifyEnded(photo: photo, in: geometry) },
-                            onRotationChanged: { value in handleRotationChanged(photo: photo, value: value) },
-                            onRotationEnded: { _ in handleRotationEnded(photo: photo, in: geometry) }
-                        )
+                canvasBackground
+                collagePhotosView(geometry)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .onAppear { canvasSize = geometry.size }
+                    .onTapGesture(count: 2) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            clearToolbar.toggle()
+                        }
                     }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .onAppear {
-                    canvasSize = geometry.size
-                }
-                .onTapGesture(count: 2) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        clearToolbar.toggle()
-                    }
-                }
             }
         }
-        .overlay(
-            // Top Toolbar Overlay (hidden when saving)
-            Group {
-                if !clearToolbar {
-                    TopToolbarView(
-                        onClose: {
-                            Task {
-                                // Set saving state to hide overlays
-                                clearToolbar = true
-                                
-                                // Small delay to allow UI to update
-                                try? await Task.sleep(nanoseconds: 100_000_000)
-                                
-                                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                                   let window = windowScene.windows.first,
-                                   let rootView = window.rootViewController?.view {
-                                    await appState.deselectCollageSession(captureView: rootView)
-                                }
-                                
-                                dismiss()
-                            }
-                        },
-                        onCopyCode: {
-                            UIPasteboard.general.string = session.inviteCode
-                            showCopyAlert = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                showCopyAlert = false
-                            }
-                        },
-                        onAddSticker: { showStickerLibrary = true },
-                        onPaste: {
-                            Task {
-                                await handlePasteAction(in: canvasSize)
-                            }
-                        },
-                        onAddPhoto: { showImageSourcePicker = true },
-                        showMenuDropdown: $showMenuDropdown,
-                        clearToolbar: clearToolbar,
-                        session: session,
-                        expirationDate: session.expiresAt
-                    )
-                }
-            },
-            alignment: .top
-        )
-        .overlay(
-            // Bottom Toolbar Overlay (hidden when saving)
-            Group {
-                if !clearToolbar {
-                    BottomToolbarView(
-                        members: appState.collageMembers,
-                        isOverTrash: isOverTrash,
-                        onTrashFrameChange: { frame in
-                            trashIconFrame = frame
-                        },
-                        onMembersPressed: { showMembersList = true },
-                        clearToolbar: clearToolbar
-                    )
-                }
-            },
-            alignment: .bottom
-        )
-        .overlay(alignment: .top) {
-            if showCopyAlert {
-                CopyAlertView()
-                    .padding(.top, 100)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .animation(.easeInOut, value: showCopyAlert)
-            }
-        }
+        .overlay(topToolbarOverlay,alignment: .top)
+        .overlay(bottomToolbarOverlay, alignment: .bottom)
+        .overlay(copyAlertOverlay, alignment: .top)
         .ignoresSafeArea(.all)
         .navigationBarHidden(true)
-        .onAppear {
-            initializePhotoStates()
-            Task {
-                await appState.loadCollageMembersForSession(collage_id: session.id)
-            }
-        }
+        .onAppear(perform: onAppear)
         .confirmationDialog("Add Photo", isPresented: $showImageSourcePicker) {
             Button("Take Photo") { showCamera = true }
             Button("Choose from Library") { showImagePicker = true }
@@ -163,38 +176,30 @@ struct CollageFullscreenView: View {
         .sheet(isPresented: $showCamera) {
             ImagePicker(image: $selectedImage, sourceType: .camera)
         }
-        .onChange(of: appState.photoUpdates.count) { _, _ in
-            updatePhotoState()
+        .sheet(isPresented: $showMembersList) {
+            MembersListView(members: appState.collageMembers)
+                .environmentObject(appState)
         }
-        .onChange(of: appState.collagePhotos.count) { _, _ in
-            // Initialize photo states for any new photos
-            for photo in appState.collagePhotos {
-                if photoStates[photo.id] == nil {
-                    let globalX = CGFloat(photo.position_x)
-                    let globalY = CGFloat(photo.position_y)
-                    
-                    photoStates[photo.id] = PhotoState(
-                        rotation: Angle(degrees: photo.rotation),
-                        scale: photo.scale,
-                        lastRotation: Angle(degrees: photo.rotation),
-                        lastScale: photo.scale,
-                        globalPosition: CGPoint(x: globalX, y: globalY)
-                    )
-                }
-            }
-        }
+        .onChange(of: appState.photoUpdates.count) { _, _ in updatePhotoState() }
+        .onChange(of: appState.collagePhotos.count) { _, _ in initializePhotoStates() }
         .onChange(of: selectedImage) { _, newValue in
-            if let image = newValue {
-                addPhotoToCanvas(image: image, in: canvasSize)
-            }
+            if let image = newValue { addPhotoToCanvas(image: image, in: canvasSize) }
         }
+        .onChange(of: isExpired) { _, _ in handleExpired() }
         .alert("Paste Failed", isPresented: .constant(pasteErrorMessage != nil)) {
             Button("OK", role: .cancel) { pasteErrorMessage = nil }
         } message: {
             Text(pasteErrorMessage ?? "")
         }
-        .sheet(isPresented: $showMembersList) {
-            MembersListView(members: appState.collageMembers)
+    }
+    
+    private func handleExpired() {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootView = window.rootViewController?.view {
+            Task {
+                await appState.captureExpiredSession(captureView: rootView)
+            }
         }
     }
     
@@ -266,7 +271,7 @@ struct CollageFullscreenView: View {
         
         Task {
             do {
-                let (data, _) = try await URLSession.shared.data(from: url)
+                let (_, _) = try await URLSession.shared.data(from: url)
                 let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
 //                    await appState.addPhotoFromImage(image, at: centerPoint)
                 await appState.addPhotoToCollage(url, at: centerPoint)
@@ -413,6 +418,7 @@ struct TopToolbarView: View {
     let clearToolbar: Bool
     let session: CollageSession
     let expirationDate: Date
+    @Binding var isExpired: Bool
     @EnvironmentObject var appState: AppState
     
     var body: some View {
@@ -434,13 +440,20 @@ struct TopToolbarView: View {
                     Text(session.theme)
                         .font(.system(size: 24))
                     
-                    TimelineView(PeriodicTimelineSchedule(from: Date(), by: 1.0)) { context in
-                        Text(expirationDate, style: .timer)
-                            .font(.subheadline)
+                    TimelineView(.periodic(from: Date(), by: 1.0)) { context in
+                        
+                        var timerDownStyle : SystemFormatStyle.Timer {
+                            .timer(countingUpIn: Date()..<session.expiresAt)
+                        }
+                        
+                        Text(session.expiresAt, format: timerDownStyle)
+                            .font(.custom("Sanchez", size: 12))
+                            .foregroundColor(.black.opacity(0.7))
                             .onAppear {
-                                
-                                if context.date >= expirationDate {
-                                    //navigate to fullscreen view
+                                if context.date >= session.expiresAt {
+                                    //Call alert for expired collage
+                                    //show notification on collage in dashboad?
+                                    isExpired = true
                                 }
                             }
                     }
@@ -479,6 +492,7 @@ struct TopToolbarView: View {
         }
         .padding(.top, 16)
     }
+    
 }
 
 // MARK: - Bottom Toolbar View
@@ -565,3 +579,4 @@ struct BottomToolbarView: View {
         )
     }
 }
+

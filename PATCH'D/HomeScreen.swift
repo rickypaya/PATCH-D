@@ -12,7 +12,6 @@ struct HomeScreenView: View {
     @EnvironmentObject var appState: AppState
     @State private var showCreateCollageSheet = false
     @State private var showInviteCodeSheet = false
-    @State private var showArchiveSheet = false
     
     var body: some View {
         ZStack {
@@ -43,9 +42,6 @@ struct HomeScreenView: View {
         }
         .sheet(isPresented: $showInviteCodeSheet) {
             InviteCodeSheet()
-        }
-        .sheet(isPresented: $showArchiveSheet) {
-            ArchiveSheet()
         }
         .onAppear {
             print("DEBUG: HomeScreenView appeared")
@@ -149,7 +145,7 @@ struct HomeScreenView: View {
                 GridItem(.flexible(), spacing: 16)
             ], spacing: 16) {
                 ForEach(appState.activeSessions) { session in
-                    RealCollagePreviewCard(session: session)
+                    RealCollagePreviewCard(session: session, photoCount: appState.collagePhotos.count)
                         .onTapGesture {
                             Task {
                                 await appState.selectCollageSession(session)
@@ -196,8 +192,11 @@ struct HomeScreenView: View {
 
 // MARK: - Real Collage Preview Card (From Dashboard)
 struct RealCollagePreviewCard: View {
+    @EnvironmentObject var appState: AppState
     let session: CollageSession
     @State var preview_url: String?
+    @State private var showExpirationAlert = false
+    @State var photoCount: Int
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -211,56 +210,52 @@ struct RealCollagePreviewCard: View {
                     .fontWeight(.bold)
                     .foregroundColor(.black)
                     .lineLimit(1)
+                
+//                TimelineView(PeriodicTimelineSchedule(from: Date(), by: 1.0)) { context in
+//                    
+//                    var timerDownStyle : SystemFormatStyle.Timer {
+//                        .timer(countingUpIn: Date()..<session.expiresAt)
+//                    }
+//                    
+//                    Text(session.expiresAt > Date() ? session.expiredAt : "Expired" , format: timerDownStyle)
+//                        .font(.custom("Sanchez", size: 12))
+//                        .foregroundColor(.black.opacity(0.7))
+//                        .onAppear {
+//                            if context.date >= session.expiresAt {
+//                                //Call alert for expired collage
+//                                //show notification on collage in dashboad?
+//                                showExpirationAlert = true
+//                            }
+//                        }
+//                }
 //                
-//                // Time Remaining
-//                Text(timeRemainingText)
-//                    .font(.custom("Sanchez", size: 12))
-//                    .foregroundColor(.black.opacity(0.7))
-                
-                TimelineView(PeriodicTimelineSchedule(from: Date(), by: 1.0)) { context in
-                    
-                    var timerDownStyle : SystemFormatStyle.Timer {
-                        .timer(countingUpIn: Date()..<session.expiresAt)
-                    }
-                    
-                    Text(session.expiresAt, format: timerDownStyle)
-                        .font(.custom("Sanchez", size: 12))
-                        .foregroundColor(.black.opacity(0.7))
-                        .onAppear {
-                            if context.date >= session.expiresAt {
-                                //Call alert for expired collage
-                                //show notification on collage in dashboad?
-                            }
-                        }
-                }
-                
-                // Photo count badge
-                if !session.photos.isEmpty {
-                    
-                    HStack {
-                        // Members Count
-                        HStack(spacing: 4) {
-                            Image(systemName: "person.2.fill")
-                                .font(.caption)
-                                .foregroundColor(.black.opacity(0.7))
-                            Text("\(session.members.count)")
-                                .font(.custom("Sanchez", size: 14))
-                                .foregroundColor(.black.opacity(0.7))
-                            
-                            Spacer()
-                            
-                            Text("\(session.photos.count) photo\(session.photos.count == 1 ? "" : "s")")
-                                .font(.custom("Sanchez", size: 12))
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .padding(6)
-                                .background(Color.black.opacity(0.7))
-                                .cornerRadius(6)
-                                .padding(6)
-                        }
+                HStack {
+                    // Members Count
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption)
+                            .foregroundColor(.black.opacity(0.7))
+                        Text("\(session.members.count)")
+                            .font(.custom("Sanchez", size: 14))
+                            .foregroundColor(.black.opacity(0.7))
                         
+                        Spacer()
+                        
+                        Text("\(photoCount) photo\(session.photos.count == 1 ? "" : "s")")
+                            .font(.custom("Sanchez", size: 12))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(6)
+                            .background(Color.black.opacity(0.7))
+                            .cornerRadius(6)
+                            .padding(6)
+                            .onAppear {
+                                photoCount = session.photos.count
+                            }
                     }
+                    
                 }
+            
             }
             .padding(4)
             .background(Color.white.opacity(0.6))
@@ -273,9 +268,20 @@ struct RealCollagePreviewCard: View {
         .onAppear {
             preview_url = session.preview_url ?? ""
         }
-        
-        
-        
+        .alert("Collage Expired", isPresented: $showExpirationAlert) {
+            Button("View Final Collage", role: .none) {
+                appState.selectedSession = session
+                appState.currentState = .final
+            }
+            Button("Dismiss", role: .cancel) {
+                // Move to archive
+                Task {
+                    await appState.refreshActiveSessions()
+                }
+            }
+        } message: {
+            Text("Your collage '\(session.theme)' has expired. View the final collage or dismiss to move it to archive.")
+        }
     }
 
     
@@ -344,11 +350,13 @@ struct RealCollagePreviewCard: View {
         if remaining <= 0 {
             return "Expired"
         }
-        
+        let days = Int(remaining) / 86400
         let hours = Int(remaining) / 3600
         let minutes = (Int(remaining) % 3600) / 60
         
-        if hours > 0 {
+        if days > 0 {
+            return "\(days)d \(hours)h \(minutes)m left"
+        } else if hours > 0 {
             return "\(hours)h \(minutes)m left"
         } else {
             return "\(minutes)m left"
@@ -425,14 +433,10 @@ struct InviteCodeSheet: View {
         isJoining = true
         
         Task {
-            do {
-                _ = try await CollageDBManager.shared.joinCollageByInviteCode(inviteCode: inviteCode, user: appState.currentUser!)
-                await appState.loadCollageSessions()
-                dismiss()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+            await appState.joinCollageWithInviteCode(inviteCode)
+            await appState.loadCollageSessions()
             isJoining = false
+            dismiss()
         }
     }
 }

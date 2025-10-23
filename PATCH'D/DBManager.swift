@@ -974,6 +974,23 @@ class CollageDBManager {
         
         return friendships
     }
+    
+    func fetchSentRequests() async throws -> [Friendship] {
+        let user = try await getCurrentUser()
+        
+        var query = supabase
+            .from("friendships")
+            .select()
+            .eq("user_id.", value: "\(user.id.uuidString)")
+            .eq("status", value: "pending")
+        
+        
+        let friendships: [Friendship] = try await query
+            .execute()
+            .value
+        
+        return friendships
+    }
 
     /// Fetch friend requests sent to the current user (pending)
     func fetchPendingFriendRequests() async throws -> [(friendship: Friendship, user: CollageUser)] {

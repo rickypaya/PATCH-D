@@ -496,7 +496,8 @@ struct CreateCollageView: View {
             }
             
             // Reload sessions
-            await appState.loadCollageSessions()
+            await appState.refreshActiveSessions()
+            appState.currentState = .dashboard
             
             dismiss()
             DispatchQueue.main.async {
