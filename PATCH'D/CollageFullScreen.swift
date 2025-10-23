@@ -6,7 +6,7 @@ struct CollageFullscreenView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
     
-    let session: CollageSession
+    @State var session: CollageSession
     
     @State private var draggedPhotoId: UUID?
     @State private var photoStates: [UUID: PhotoState] = [:]
@@ -107,7 +107,9 @@ struct CollageFullscreenView: View {
                         },
                         onAddPhoto: { showImageSourcePicker = true },
                         showMenuDropdown: $showMenuDropdown,
-                        clearToolbar: clearToolbar
+                        clearToolbar: clearToolbar,
+                        session: session,
+                        expirationDate: session.expiresAt
                     )
                 }
             },
@@ -410,6 +412,9 @@ struct TopToolbarView: View {
     let onAddPhoto: () -> Void
     @Binding var showMenuDropdown: Bool
     let clearToolbar: Bool
+    let session: CollageSession
+    let expirationDate: Date
+    @EnvironmentObject var appState: AppState
     
     var body: some View {
         ZStack {
@@ -422,6 +427,24 @@ struct TopToolbarView: View {
                         .frame(width: 40, height: 40)
                         .background(Color.black.opacity(0.6))
                         .clipShape(Circle())
+                }
+                
+                Spacer()
+                
+                VStack {
+                    Text(session.theme)
+                        .font(.system(size: 24))
+                    
+                    TimelineView(PeriodicTimelineSchedule(from: Date(), by: 1.0)) { context in
+                        Text(expirationDate, style: .timer)
+                            .font(.subheadline)
+                            .onAppear {
+                                
+                                if context.date >= expirationDate {
+                                    //navigate to fullscreen view
+                                }
+                            }
+                    }
                 }
                 
                 Spacer()

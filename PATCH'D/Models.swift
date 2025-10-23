@@ -48,6 +48,8 @@ enum CurrState {
     case profile
     case dashboard
     case fullscreen
+    case friendsList
+    case collageInvites
 }
 
 struct CollageUser: Identifiable, Codable {
@@ -56,6 +58,7 @@ struct CollageUser: Identifiable, Codable {
     var username: String
     var avatarUrl: String?
     var createdAt: Date
+    var updatedAt: Date?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -63,6 +66,7 @@ struct CollageUser: Identifiable, Codable {
         case username
         case avatarUrl = "avatar_url"
         case createdAt = "created_at"
+        case updatedAt = "updated_at"
     }
 }
 
@@ -200,5 +204,48 @@ struct CollageSession: Identifiable {
     var isActive: Bool {
         let now = Date()
         return now >= startsAt && now <= expiresAt
+    }
+}
+
+
+// MARK: - Friendship Models
+
+struct Friendship: Codable {
+    let id: UUID
+    let userId: UUID
+    let friendId: UUID
+    let status: String
+    let createdAt: Date
+    let updatedAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case friendId = "friend_id"
+        case status
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+// MARK: - Collage Invite Models
+
+struct CollageInvite: Codable {
+    let id: UUID
+    let collageId: UUID
+    let senderId: UUID
+    let receiverId: UUID
+    let status: String
+    let createdAt: Date
+    let updatedAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case collageId = "collage_id"
+        case senderId = "sender_id"
+        case receiverId = "receiver_id"
+        case status
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
     }
 }

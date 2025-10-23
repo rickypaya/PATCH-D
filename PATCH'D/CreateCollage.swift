@@ -473,42 +473,32 @@ struct CreateCollageView: View {
         errorMessage = nil
         
         Task {
-            do {
-                if !inviteCodeInput.trimmingCharacters(in: .whitespaces).isEmpty {
-                    // Join existing collage with invite code
-                    await appState.joinCollageWithInviteCode(inviteCodeInput.trimmingCharacters(in: .whitespaces))
+            if !inviteCodeInput.trimmingCharacters(in: .whitespaces).isEmpty {
+                // Join existing collage with invite code
+                await appState.joinCollageWithInviteCode(inviteCodeInput.trimmingCharacters(in: .whitespaces))
+                
+            } else {
+                // Create new collage with theme
+                let theme: String
+                if isPartyMode {
+                    // Use random theme for Party Mode
+                    theme = predefinedThemes.randomElement() ?? "Party Time 🎉"
                 } else {
-                    // Create new collage with theme
-                    let theme: String
-                    if isPartyMode {
-                        // Use random theme for Party Mode
-                        theme = predefinedThemes.randomElement() ?? "Party Time 🎉"
-                    } else {
-                        // Use user input theme for regular mode
-                        theme = themeInput.trimmingCharacters(in: .whitespaces)
-                    }
-                    
-                    await appState.createNewCollageSession(
-                        theme: theme,
-                        duration: selectedDuration,
-                        isPartyMode: isPartyMode
-                    )
+                    // Use user input theme for regular mode
+                    theme = themeInput.trimmingCharacters(in: .whitespaces)
                 }
                 
-                // Reload sessions
-                await appState.loadCollageSessions()
-                
-                DispatchQueue.main.async {
-                    // Navigate to CollageFullScreen view
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        appState.currentState = .fullscreen
-                    }
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    errorMessage = error.localizedDescription
-                }
+                await appState.createNewCollageSession(
+                    theme: theme,
+                    duration: selectedDuration,
+                    isPartyMode: isPartyMode
+                )
             }
+            
+            // Reload sessions
+            await appState.loadCollageSessions()
+            
+            dismiss()
             DispatchQueue.main.async {
                 isCreating = false
             }

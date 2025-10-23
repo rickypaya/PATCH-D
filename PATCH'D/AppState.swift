@@ -20,6 +20,16 @@ class AppState: ObservableObject {
     @Published var collagePhotos: [CollagePhoto] = []
     @Published var collageMembers: [CollageUser] = []
     
+    // MARK: - Friendship State
+    @Published var friends: [CollageUser] = []
+    @Published var pendingFriendRequests: [(friendship: Friendship, user: CollageUser)] = []
+    @Published var sentFriendRequests: [Friendship] = []
+    @Published var friendshipStatus: [UUID: String] = [:] // userId -> status
+    
+    // MARK: - Collage Invite State
+    @Published var pendingCollageInvites: [(invite: CollageInvite, collage: Collage, sender: CollageUser)] = []
+    @Published var sentCollageInvites: [UUID: [(invite: CollageInvite, receiver: CollageUser)]] = [:] // collageId -> invites
+    
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var photoUpdates: [UUID] = []
@@ -27,6 +37,9 @@ class AppState: ObservableObject {
     // MARK: - Cache for UI optimization
     private var sessionCache: [UUID: CollageSession] = [:]
     private var photoCache: [UUID: [CollagePhoto]] = [:] // sessionId -> photos
+    private var friendsCache: [CollageUser] = []
+    private var friendRequestsCache: [(Friendship, CollageUser)] = []
+    private var collageInvitesCache: [(CollageInvite, Collage, CollageUser)] = []
     
     private var realTimeTask: Task<Void, Never>?
     
@@ -48,6 +61,13 @@ class AppState: ObservableObject {
             await loadCurrentUser()
             await fetchMemberships()
             await loadCollageSessions()
+            
+            // Load social data if authenticated
+            if isAuthenticated {
+                await loadFriends()
+                await loadPendingFriendRequests()
+                await loadPendingCollageInvites()
+            }
             
             // Auto-cleanup expired collages in background
             autoCleanupExpiredCollages()
@@ -237,6 +257,11 @@ class AppState: ObservableObject {
             await fetchMemberships()
             await loadCollageSessions()
             
+            // Load social data
+            await loadFriends()
+            await loadPendingFriendRequests()
+            await loadPendingCollageInvites()
+            
             currentState = .homeCollageCarousel
         } catch {
             errorMessage = error.localizedDescription
@@ -264,9 +289,16 @@ class AppState: ObservableObject {
             collagePhotos = []
             collageMembers = []
             
+            // Clear social data
+            friends = []
+            pendingFriendRequests = []
+            sentFriendRequests = []
+            friendshipStatus = [:]
+            pendingCollageInvites = []
+            sentCollageInvites = [:]
+            
             // Clear caches
-            sessionCache.removeAll()
-            photoCache.removeAll()
+            clearCaches()
             
         } catch {
             errorMessage = error.localizedDescription
@@ -563,16 +595,352 @@ class AppState: ObservableObject {
         }
     }
     
+    // MARK: - Friendship Functions
+    
+    /// Load friends list with caching
+    func loadFriends(forceRefresh: Bool = false) async {
+        // Return cached if available and not forcing refresh
+        if !forceRefresh && !friendsCache.isEmpty {
+            friends = friendsCache
+            return
+        }
+        
+        do {
+            let fetchedFriends = try await dbManager.fetchFriends()
+            friends = fetchedFriends
+            friendsCache = fetchedFriends
+        } catch {
+            errorMessage = "Failed to load friends: \(error.localizedDescription)"
+        }
+    }
+    
+    /// Load pending friend requests received
+    func loadPendingFriendRequests(forceRefresh: Bool = false) async {
+        // Return cached if available and not forcing refresh
+        if !forceRefresh && !friendRequestsCache.isEmpty {
+            pendingFriendRequests = friendRequestsCache
+            return
+        }
+        
+        do {
+            let requests = try await dbManager.fetchPendingFriendRequests()
+            pendingFriendRequests = requests
+            friendRequestsCache = requests
+        } catch {
+            errorMessage = "Failed to load friend requests: \(error.localizedDescription)"
+        }
+    }
+    
+    /// Load sent friend requests
+    func loadSentFriendRequests() async {
+        do {
+            let requests = try await dbManager.fetchFriendships(status: "pending")
+            sentFriendRequests = requests
+        } catch {
+            errorMessage = "Failed to load sent requests: \(error.localizedDescription)"
+        }
+    }
+    
+    /// Send a friend request
+    func sendFriendRequest(to userId: UUID) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await dbManager.sendFriendRequest(to: userId)
+            
+            // Update friendship status cache
+            friendshipStatus[userId] = "pending"
+            
+            // Refresh sent requests
+            await loadSentFriendRequests()
+            
+        } catch {
+            errorMessage = "Failed to send friend request: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    /// Accept a friend request
+    func acceptFriendRequest(_ friendshipId: UUID) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await dbManager.acceptFriendRequest(friendshipId: friendshipId)
+            
+            // Remove from pending requests
+            if let index = pendingFriendRequests.firstIndex(where: { $0.friendship.id == friendshipId }) {
+                let acceptedUserId = pendingFriendRequests[index].user.id
+                friendshipStatus[acceptedUserId] = "accepted"
+                pendingFriendRequests.remove(at: index)
+            }
+            
+            // Refresh friends list and cache
+            await loadFriends(forceRefresh: true)
+            
+            // Clear request cache
+            friendRequestsCache = pendingFriendRequests
+            
+        } catch {
+            errorMessage = "Failed to accept friend request: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    /// Reject a friend request
+    func rejectFriendRequest(_ friendshipId: UUID) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await dbManager.rejectFriendRequest(friendshipId: friendshipId)
+            
+            // Remove from pending requests
+            if let index = pendingFriendRequests.firstIndex(where: { $0.friendship.id == friendshipId }) {
+                let rejectedUserId = pendingFriendRequests[index].user.id
+                friendshipStatus[rejectedUserId] = "rejected"
+                pendingFriendRequests.remove(at: index)
+            }
+            
+            // Clear request cache
+            friendRequestsCache = pendingFriendRequests
+            
+        } catch {
+            errorMessage = "Failed to reject friend request: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    /// Remove/unfriend a user
+    func removeFriend(_ friendshipId: UUID, userId: UUID) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await dbManager.removeFriendship(friendshipId: friendshipId)
+            
+            // Remove from friends list
+            friends.removeAll { $0.id == userId }
+            
+            // Update caches
+            friendsCache = friends
+            friendshipStatus.removeValue(forKey: userId)
+            
+        } catch {
+            errorMessage = "Failed to remove friend: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    /// Check friendship status with a specific user
+    func checkFriendshipStatus(with userId: UUID) async -> String? {
+        // Check cache first
+        if let status = friendshipStatus[userId] {
+            return status
+        }
+        
+        do {
+            let status = try await dbManager.checkFriendshipStatus(with: userId)
+            
+            // Cache the result
+            if let status = status {
+                friendshipStatus[userId] = status
+            }
+            
+            return status
+        } catch {
+            print("Failed to check friendship status: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    // MARK: - Collage Invite Functions
+    
+    /// Load pending collage invites with caching
+    func loadPendingCollageInvites(forceRefresh: Bool = false) async {
+        // Return cached if available and not forcing refresh
+        if !forceRefresh && !collageInvitesCache.isEmpty {
+            pendingCollageInvites = collageInvitesCache
+            return
+        }
+        
+        do {
+            let invites = try await dbManager.fetchPendingCollageInvites()
+            pendingCollageInvites = invites
+            collageInvitesCache = invites
+        } catch {
+            errorMessage = "Failed to load collage invites: \(error.localizedDescription)"
+        }
+    }
+    
+    /// Load sent invites for a specific collage
+    func loadSentCollageInvites(for collageId: UUID) async {
+        do {
+            let invites = try await dbManager.fetchSentCollageInvites(collageId: collageId)
+            sentCollageInvites[collageId] = invites
+        } catch {
+            errorMessage = "Failed to load sent invites: \(error.localizedDescription)"
+        }
+    }
+    
+    /// Send a collage invite to a friend
+    func sendCollageInvite(collageId: UUID, to userId: UUID) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await dbManager.sendCollageInvite(collageId: collageId, to: userId)
+            
+            // Refresh sent invites for this collage
+            await loadSentCollageInvites(for: collageId)
+            
+        } catch {
+            errorMessage = "Failed to send collage invite: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    /// Send collage invites to multiple friends
+    func sendCollageInvitesToMultipleFriends(collageId: UUID, friendIds: [UUID]) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await dbManager.sendCollageInvitesToFriends(collageId: collageId, friendIds: friendIds)
+            
+            // Refresh sent invites for this collage
+            await loadSentCollageInvites(for: collageId)
+            
+        } catch {
+            errorMessage = "Failed to send collage invites: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    /// Accept a collage invite
+    func acceptCollageInvite(_ inviteId: UUID) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            let session = try await dbManager.acceptCollageInvite(inviteId: inviteId)
+            
+            // Remove from pending invites
+            pendingCollageInvites.removeAll { $0.invite.id == inviteId }
+            collageInvitesCache = pendingCollageInvites
+            
+            // Add to memberships and active sessions
+            if !collageMemberships.contains(session.id) {
+                collageMemberships.append(session.id)
+            }
+            
+            if !activeSessions.contains(where: { $0.id == session.id }) {
+                activeSessions.append(session)
+            }
+            
+            // Cache the session
+            sessionCache[session.id] = session
+            
+        } catch {
+            errorMessage = "Failed to accept collage invite: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    /// Reject a collage invite
+    func rejectCollageInvite(_ inviteId: UUID) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await dbManager.rejectCollageInvite(inviteId: inviteId)
+            
+            // Remove from pending invites
+            pendingCollageInvites.removeAll { $0.invite.id == inviteId }
+            collageInvitesCache = pendingCollageInvites
+            
+        } catch {
+            errorMessage = "Failed to reject collage invite: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    /// Delete a sent collage invite
+    func deleteCollageInvite(_ inviteId: UUID, collageId: UUID) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            try await dbManager.deleteCollageInvite(inviteId: inviteId)
+            
+            // Remove from sent invites
+            if var invites = sentCollageInvites[collageId] {
+                invites.removeAll { $0.invite.id == inviteId }
+                sentCollageInvites[collageId] = invites
+            }
+            
+        } catch {
+            errorMessage = "Failed to delete invite: \(error.localizedDescription)"
+        }
+        
+        isLoading = false
+    }
+    
+    /// Get friends who haven't been invited to a specific collage
+    func getUninvitedFriends(for collageId: UUID) async -> [CollageUser] {
+        // Ensure we have the latest sent invites
+        await loadSentCollageInvites(for: collageId)
+        
+        guard let sentInvites = sentCollageInvites[collageId] else {
+            return friends
+        }
+        
+        let invitedUserIds = Set(sentInvites.map { $0.receiver.id })
+        
+        // Also exclude current members
+        let memberIds = Set(collageMembers.map { $0.id })
+        
+        return friends.filter { friend in
+            !invitedUserIds.contains(friend.id) && !memberIds.contains(friend.id)
+        }
+    }
+    
     // MARK: - Cache Management
     
     func clearCaches() {
         sessionCache.removeAll()
         photoCache.removeAll()
+        friendsCache.removeAll()
+        friendRequestsCache.removeAll()
+        collageInvitesCache.removeAll()
     }
     
     func invalidateSessionCache(for sessionId: UUID) {
         sessionCache.removeValue(forKey: sessionId)
         photoCache.removeValue(forKey: sessionId)
+    }
+    
+    func invalidateSocialCaches() {
+        friendsCache.removeAll()
+        friendRequestsCache.removeAll()
+        collageInvitesCache.removeAll()
+        friendshipStatus.removeAll()
+    }
+    
+    /// Refresh all social data
+    func refreshSocialData() async {
+        await loadFriends(forceRefresh: true)
+        await loadPendingFriendRequests(forceRefresh: true)
+        await loadPendingCollageInvites(forceRefresh: true)
     }
     
     // MARK: - Joining Collages
@@ -661,4 +1029,253 @@ class AppState: ObservableObject {
             try? await self.dbManager.cleanupExpiredCollagesForUser(userId: currentUser.id)
         }
     }
+    
+    // MARK: - Convenience Computed Properties
+    
+    /// Number of pending friend requests
+    var pendingFriendRequestCount: Int {
+        pendingFriendRequests.count
+    }
+    
+    /// Number of pending collage invites
+    var pendingCollageInviteCount: Int {
+        pendingCollageInvites.count
+    }
+    
+    /// Total pending notifications (friend requests + collage invites)
+    var totalPendingNotifications: Int {
+        pendingFriendRequestCount + pendingCollageInviteCount
+    }
+    
+    /// Check if a user is a friend
+    func isFriend(_ userId: UUID) -> Bool {
+        friends.contains { $0.id == userId }
+    }
+    
+    /// Check if there's a pending friend request from a user
+    func hasPendingFriendRequest(from userId: UUID) -> Bool {
+        pendingFriendRequests.contains { $0.user.id == userId }
+    }
+    
+    /// Check if there's a pending collage invite for a specific collage
+    func hasPendingCollageInvite(for collageId: UUID) -> Bool {
+        pendingCollageInvites.contains { $0.collage.id == collageId }
+    }
+    
+    /// Get friendship ID for a specific user (useful for removing friends)
+    func getFriendshipId(for userId: UUID) async -> UUID? {
+        do {
+            let friendships = try await dbManager.fetchFriendships(status: "accepted")
+            
+            let friendship = friendships.first { friendship in
+                friendship.friendId == userId ||
+                (friendship.userId == currentUser?.id && friendship.friendId == userId) ||
+                (friendship.friendId == currentUser?.id && friendship.userId == userId)
+            }
+            
+            return friendship?.id
+        } catch {
+            print("Failed to get friendship ID: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    // MARK: - Search Functions
+    
+    /// Search friends by username
+    func searchFriends(query: String) -> [CollageUser] {
+        guard !query.isEmpty else { return friends }
+        
+        let lowercasedQuery = query.lowercased()
+        return friends.filter { friend in
+            friend.username.lowercased().contains(lowercasedQuery)
+        }
+    }
+    
+    /// Search pending friend requests by username
+    func searchPendingRequests(query: String) -> [(friendship: Friendship, user: CollageUser)] {
+        guard !query.isEmpty else { return pendingFriendRequests }
+        
+        let lowercasedQuery = query.lowercased()
+        return pendingFriendRequests.filter { request in
+            request.user.username.lowercased().contains(lowercasedQuery)
+        }
+    }
+    
+    // MARK: - Batch Operations
+    
+    /// Accept multiple friend requests at once
+    func acceptMultipleFriendRequests(_ friendshipIds: [UUID]) async {
+        isLoading = true
+        errorMessage = nil
+        
+        await withTaskGroup(of: Void.self) { group in
+            for friendshipId in friendshipIds {
+                group.addTask {
+                    do {
+                        try await self.dbManager.acceptFriendRequest(friendshipId: friendshipId)
+                    } catch {
+                        print("Failed to accept request \(friendshipId): \(error)")
+                    }
+                }
+            }
+        }
+        
+        // Refresh social data after batch operation
+        await refreshSocialData()
+        
+        isLoading = false
+    }
+    
+    /// Reject multiple friend requests at once
+    func rejectMultipleFriendRequests(_ friendshipIds: [UUID]) async {
+        isLoading = true
+        errorMessage = nil
+        
+        await withTaskGroup(of: Void.self) { group in
+            for friendshipId in friendshipIds {
+                group.addTask {
+                    do {
+                        try await self.dbManager.rejectFriendRequest(friendshipId: friendshipId)
+                    } catch {
+                        print("Failed to reject request \(friendshipId): \(error)")
+                    }
+                }
+            }
+        }
+        
+        // Refresh pending requests
+        await loadPendingFriendRequests(forceRefresh: true)
+        
+        isLoading = false
+    }
+    
+    /// Accept multiple collage invites at once
+    func acceptMultipleCollageInvites(_ inviteIds: [UUID]) async {
+        isLoading = true
+        errorMessage = nil
+        
+        for inviteId in inviteIds {
+            do {
+                let session = try await dbManager.acceptCollageInvite(inviteId: inviteId)
+                
+                // Add to memberships and active sessions
+                if !collageMemberships.contains(session.id) {
+                    collageMemberships.append(session.id)
+                }
+                
+                if !activeSessions.contains(where: { $0.id == session.id }) {
+                    activeSessions.append(session)
+                }
+                
+                // Cache the session
+                sessionCache[session.id] = session
+                
+            } catch {
+                print("Failed to accept invite \(inviteId): \(error)")
+            }
+        }
+        
+        // Refresh collage invites
+        await loadPendingCollageInvites(forceRefresh: true)
+        
+        isLoading = false
+    }
+    
+    // MARK: - User Search Functions
+
+    /// Search for users by username or email
+    func searchUsers(query: String) async throws -> [CollageUser] {
+        guard let currentUser = currentUser else {
+            throw NSError(domain: "AppState", code: 401, userInfo: [NSLocalizedDescriptionKey: "No user logged in"])
+        }
+        
+        guard !query.isEmpty else {
+            return []
+        }
+        
+        do {
+            let results = try await dbManager.searchUsers(query: query, limit: 20)
+            
+            // Filter out current user from results
+            let filteredResults = results.filter { $0.id != currentUser.id }
+            
+            return filteredResults
+        } catch {
+            errorMessage = "Failed to search users: \(error.localizedDescription)"
+            throw error
+        }
+    }
+
+    /// Search for a user by exact username
+    func searchUserByUsername(_ username: String) async throws -> CollageUser? {
+        do {
+            let user = try await dbManager.searchUserByUsername(username: username)
+            
+            // Don't return current user
+            if user?.id == currentUser?.id {
+                return nil
+            }
+            
+            return user
+        } catch {
+            errorMessage = "Failed to search user: \(error.localizedDescription)"
+            throw error
+        }
+    }
+
+    /// Search for a user by exact email
+    func searchUserByEmail(_ email: String) async throws -> CollageUser? {
+        do {
+            let user = try await dbManager.searchUserByEmail(email: email)
+            
+            // Don't return current user
+            if user?.id == currentUser?.id {
+                return nil
+            }
+            
+            return user
+        } catch {
+            errorMessage = "Failed to search user: \(error.localizedDescription)"
+            throw error
+        }
+    }
 }
+
+// MARK: - Preview Helpers
+
+#if DEBUG
+extension AppState {
+    static func preview() -> AppState {
+        let state = AppState()
+        state.isAuthenticated = true
+        state.currentUser = CollageUser(
+            id: UUID(),
+            email: "preview@example.com",
+            username: "previewuser",
+            avatarUrl: nil,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        state.friends = [
+            CollageUser(
+                id: UUID(),
+                email: "friend1@example.com",
+                username: "friend1",
+                avatarUrl: nil,
+                createdAt: Date(),
+                updatedAt: Date()
+            ),
+            CollageUser(
+                id: UUID(),
+                email: "friend2@example.com",
+                username: "friend2",
+                avatarUrl: nil,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+        ]
+        return state
+    }
+}
+#endif

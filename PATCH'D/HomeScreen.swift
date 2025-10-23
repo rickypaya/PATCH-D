@@ -89,35 +89,18 @@ struct HomeScreenView: View {
             
             Spacer()
             
-            // Hamburger menu
-            Menu {
-                Button(action: {
-                    showCreateCollageSheet = true
-                }) {
-                    Label("Create", systemImage: "plus.square")
-                }
-                
-                Button(action: {
-                    showInviteCodeSheet = true
-                }) {
-                    Label("Join", systemImage: "link")
-                }
-                
-                Button(action: {
-                    showArchiveSheet = true
-                }) {
-                    Label("Archive", systemImage: "archivebox")
-                }
-            } label: {
+            Button(action: {
+                showInviteCodeSheet.toggle()
+            }, label: {
                 Circle()
                     .fill(Color(red: 0.792, green: 0.322, blue: 0.188)) // CA5230
                     .frame(width: 40, height: 40)
                     .overlay(
-                        Image(systemName: "line.3.horizontal")
+                        Image(systemName: "link.badge.plus" )
                             .foregroundColor(.white) // FFFFFF
                             .font(.system(size: 20))
                     )
-            }
+            })
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
@@ -217,34 +200,72 @@ struct RealCollagePreviewCard: View {
     @State var preview_url: String?
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        ZStack(alignment: .bottomLeading) {
             // Collage Preview Image
             previewImageView
             
-            Group {
+            VStack(alignment: .leading, spacing: 8) {
                 // Theme
                 Text(session.theme)
                     .font(.custom("Sanchez", size: 16))
                     .fontWeight(.bold)
                     .foregroundColor(.black)
                     .lineLimit(1)
+//                
+//                // Time Remaining
+//                Text(timeRemainingText)
+//                    .font(.custom("Sanchez", size: 12))
+//                    .foregroundColor(.black.opacity(0.7))
                 
-                // Time Remaining
-                Text(timeRemainingText)
-                    .font(.custom("Sanchez", size: 12))
-                    .foregroundColor(.black.opacity(0.7))
+                TimelineView(PeriodicTimelineSchedule(from: Date(), by: 1.0)) { context in
+                    
+                    var timerDownStyle : SystemFormatStyle.Timer {
+                        .timer(countingUpIn: Date()..<session.expiresAt)
+                    }
+                    
+                    Text(session.expiresAt, format: timerDownStyle)
+                        .font(.custom("Sanchez", size: 12))
+                        .foregroundColor(.black.opacity(0.7))
+                        .onAppear {
+                            if context.date >= session.expiresAt {
+                                //Call alert for expired collage
+                                //show notification on collage in dashboad?
+                            }
+                        }
+                }
                 
-                // Members Count
-                HStack(spacing: 4) {
-                    Image(systemName: "person.2.fill")
-                        .font(.caption)
-                        .foregroundColor(.black.opacity(0.7))
-                    Text("\(session.members.count)")
-                        .font(.custom("Sanchez", size: 14))
-                        .foregroundColor(.black.opacity(0.7))
+                // Photo count badge
+                if !session.photos.isEmpty {
+                    
+                    HStack {
+                        // Members Count
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.2.fill")
+                                .font(.caption)
+                                .foregroundColor(.black.opacity(0.7))
+                            Text("\(session.members.count)")
+                                .font(.custom("Sanchez", size: 14))
+                                .foregroundColor(.black.opacity(0.7))
+                            
+                            Spacer()
+                            
+                            Text("\(session.photos.count) photo\(session.photos.count == 1 ? "" : "s")")
+                                .font(.custom("Sanchez", size: 12))
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .padding(6)
+                                .background(Color.black.opacity(0.7))
+                                .cornerRadius(6)
+                                .padding(6)
+                        }
+                        
+                    }
                 }
             }
             .padding(4)
+            .background(Color.white.opacity(0.6))
+            .shadow(color: Color.gray.opacity(0.5), radius: 4, x: 0, y: -2)
+            
         }
         .background(Color.white.opacity(0.8))
         .cornerRadius(16)
@@ -252,7 +273,11 @@ struct RealCollagePreviewCard: View {
         .onAppear {
             preview_url = session.preview_url ?? ""
         }
+        
+        
+        
     }
+
     
     private var previewImageView: some View {
         ZStack {
@@ -276,24 +301,6 @@ struct RealCollagePreviewCard: View {
                         emptyPreviewView
                     @unknown default:
                         emptyPreviewView
-                    }
-                }
-                
-                // Photo count badge
-                if !session.photos.isEmpty {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            Text("\(session.photos.count) photo\(session.photos.count == 1 ? "" : "s")")
-                                .font(.custom("Sanchez", size: 12))
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .padding(6)
-                                .background(Color.black.opacity(0.7))
-                                .cornerRadius(6)
-                                .padding(6)
-                        }
                     }
                 }
             } else {

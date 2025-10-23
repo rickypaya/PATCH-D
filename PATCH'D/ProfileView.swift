@@ -15,17 +15,21 @@ struct ProfileView: View {
     @State private var isSaving = false
     @State private var showImagePicker = false
     @State private var showCamera = false
+    @State private var showLibrary = false
     @State private var selectedImage: UIImage?
     @State private var errorMessage: String?
     @State private var successMessage: String?
-    
+    @State private var confirmSignOut = false
+    @Environment(\.dismiss) var dismiss
     // Real data for user's contributed collages (both created and joined)
+    //corrected to archive data
     private var userContributedCollages: [CollageSession] {
-        appState.activeSessions.filter { session in
-            // Show collages where user is either the creator OR a member
-            session.creator.id == appState.currentUser?.id || 
-            session.members.contains { $0.id == appState.currentUser?.id }
-        }
+//        appState.activeSessions.filter { session in
+//            // Show collages where user is either the creator OR a member
+//            session.creator.id == appState.currentUser?.id || 
+//            session.members.contains { $0.id == appState.currentUser?.id }
+//        }
+        appState.archive
     }
     
     // Total unique members across all user's contributed collages
@@ -77,23 +81,30 @@ struct ProfileView: View {
         .onTapGesture {
             showImagePicker = true
         }
+        .confirmationDialog("Sign Out?", isPresented: $confirmSignOut) {
+            Button("Sign Out") { Task {
+                try await appState.signOut()
+                dismiss()
+            } }
+            Button("Cancel", role: .cancel) { confirmSignOut = false }
+        }
     }
     
     private var topNavigationBar: some View {
         HStack {
             // Profile icon (left)
-            Button(action: {
-                appState.currentState = .homeScreen
-            }) {
+            Button(action:{
+                confirmSignOut = true
+            }, label: {
                 Circle()
                     .fill(Color.yellow)
                     .frame(width: 40, height: 40)
                     .overlay(
-                        Image(systemName: "person.fill")
+                        Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.black)
                             .font(.system(size: 20))
                     )
-            }
+            })
             
             Spacer()
             
@@ -105,29 +116,19 @@ struct ProfileView: View {
             
             Spacer()
             
-            // Hamburger menu (right)
-            Menu {
-                Button(action: {}) {
-                    Label("Settings", systemImage: "gear")
-                }
-                Button(action: {}) {
-                    Label("Help", systemImage: "questionmark.circle")
-                }
-                Button(action: {
-                    Task { try await appState.signOut() }
-                }) {
-                    Label("Sign Out", systemImage: "arrow.right.square")
-                }
-            } label: {
+            // Back button -> Right
+            Button(action: {
+                appState.currentState = .dashboard
+            }, label: {
                 Circle()
                     .fill(Color.yellow)
                     .frame(width: 40, height: 40)
                     .overlay(
-                        Image(systemName: "line.3.horizontal")
+                        Image(systemName: "arrowshape.right.circle")
                             .foregroundColor(.black)
                             .font(.system(size: 20))
                     )
-            }
+            })
         }
         .padding(.horizontal, 20)
         .padding(.top, 10)
@@ -149,7 +150,7 @@ struct ProfileView: View {
                         .font(.custom("Sanchez", size: 28))
                         .fontWeight(.bold)
                         .foregroundColor(.black)
-                    Text("Collages")
+                    Text("Archived")
                         .font(.custom("Sanchez", size: 16))
                         .foregroundColor(.black.opacity(0.7))
                 }
@@ -160,31 +161,61 @@ struct ProfileView: View {
                     .frame(width: 1, height: 40)
                 
                 // Friends count (total unique members across all collages)
-                VStack(spacing: 4) {
-                    Text("\(totalUniqueMembers)")
-                        .font(.custom("Sanchez", size: 28))
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                    Text("Friends")
-                        .font(.custom("Sanchez", size: 16))
-                        .foregroundColor(.black.opacity(0.7))
+                //will change to some friends list implementation
+                
+                Button(action: {
+                    Task {
+                        appState.currentState = .friendsList
+                    }
+                }) {
+                    VStack(spacing: 4) {
+                        Text("\(appState.friends.count)")
+                            .font(.custom("Sanchez", size: 28))
+                            .fontWeight(.bold)
+                            .foregroundColor(.black)
+                        Text("Friends")
+                            .font(.custom("Sanchez", size: 16))
+                            .foregroundColor(.black.opacity(0.7))
+                    }
                 }
+                
+                Rectangle()
+                    .fill(Color.black.opacity(0.3))
+                    .frame(width: 1, height: 40)
+                
+                
+                Button(action: {
+                    Task {
+                        appState.currentState = .collageInvites
+                    }
+                }) {
+                    VStack(spacing: 4) {
+                        Text("\(appState.pendingCollageInvites.count)")
+                            .font(.custom("Sanchez", size: 28))
+                            .fontWeight(.bold)
+                            .foregroundColor(.black)
+                        Text("Invites")
+                            .font(.custom("Sanchez", size: 16))
+                            .foregroundColor(.black.opacity(0.7))
+                    }
+                }
+                
             }
             
             // Share Profile button
-            Button(action: {
-                // TODO: Implement share profile functionality
-            }) {
-                Text("Share Profile")
-                    .font(.custom("Sanchez", size: 18))
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(Color.black)
-                    .cornerRadius(12)
-            }
-            .padding(.horizontal, 40)
+//            Button(action: {
+//                // TODO: Implement share profile functionality
+//            }) {
+//                Text("Share Profile")
+//                    .font(.custom("Sanchez", size: 18))
+//                    .fontWeight(.bold)
+//                    .foregroundColor(.white)
+//                    .frame(maxWidth: .infinity)
+//                    .frame(height: 50)
+//                    .background(Color.black)
+//                    .cornerRadius(12)
+//            }
+//            .padding(.horizontal, 40)
         }
     }
     
@@ -239,19 +270,21 @@ struct ProfileView: View {
                 showCamera = true
             }
             Button("Choose from Library") {
-                showImagePicker = true
+                showLibrary = true
             }
             Button("Cancel", role: .cancel) { }
         }
-        .sheet(isPresented: $showImagePicker) {
-            ImagePicker(image: $selectedImage, sourceType: UIImagePickerController.SourceType.photoLibrary)
+        .sheet(isPresented: $showLibrary) {
+            ImagePicker(image: $selectedImage, sourceType: .photoLibrary)
         }
         .sheet(isPresented: $showCamera) {
-            ImagePicker(image: $selectedImage, sourceType: UIImagePickerController.SourceType.camera)
+            ImagePicker(image: $selectedImage, sourceType: .camera)
         }
         .onChange(of: selectedImage) { oldValue, newValue in
             if let image = newValue {
                 appState.updateUserAvatar(image)
+                showCamera = false
+                showLibrary = false
             }
         }
     }
@@ -320,9 +353,6 @@ struct ProfileCollagePreviewCard: View {
         }
         .onAppear {
             preview_url = session.preview_url ?? ""
-        }
-        .onTapGesture {
-            // TODO: Navigate to collage detail or fullscreen
         }
     }
     

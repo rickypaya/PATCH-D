@@ -4,6 +4,7 @@
 //
 import SwiftUI
 import Supabase
+import avif
 
 //MARK: - Collage DB Manager
 
@@ -15,6 +16,10 @@ class CollageDBManager {
     // MARK: - Cache for reducing redundant calls
     private var userCache: [UUID: CollageUser] = [:]
     private var membershipCache: [UUID: [UUID]] = [:] // userId -> [collageIds]
+    /// Cache for friendships to reduce redundant calls
+    private var friendshipsCache: [UUID: [Friendship]] = [:] // userId -> friendships
+    private var friendshipStatusCache: [String: String] = [:] // "userId-friendId" -> status
+
     
     private init() {
         supabase = SupabaseClient(
@@ -64,6 +69,9 @@ class CollageDBManager {
     func clearCache() {
         userCache.removeAll()
         membershipCache.removeAll()
+        friendshipsCache.removeAll()
+        friendshipStatusCache.removeAll()
+        collageInvitesCache.removeAll()
     }
     
     //MARK: - Theme Functions
@@ -395,17 +403,26 @@ class CollageDBManager {
     }
     
     func uploadImage(_ image: UIImage, bucket: String, folder: String, fileName: String) async throws -> String {
-        guard let imageData = image.pngData() else {
-            throw NSError(domain: "DBManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"])
-        }
+        // Perform AVIF encoding on a background thread
+        let avifEncodedData = try await Task.detached(priority: .userInitiated) {
+            try AVIFEncoder.encode(image: image)
+        }.value
         
-        let filePath = "\(folder)/\(fileName)"
+        // Ensure the fileName has .avif extension
+        let avifFileName = fileName.hasSuffix(".avif") ? fileName : "\(fileName.replacingOccurrences(of: ".png", with: "").replacingOccurrences(of: ".jpg", with: "").replacingOccurrences(of: ".jpeg", with: "")).avif"
+        let filePath = "\(folder)/\(avifFileName)"
         
-        try await supabase.storage
+        // Upload to Supabase storage
+        try await self.supabase.storage
             .from(bucket)
-            .upload(path: filePath, file: imageData, options: FileOptions(contentType: "image/jpeg", upsert: true))
+            .upload(
+                filePath,
+                data: avifEncodedData,
+                options: FileOptions(contentType: "image/avif", upsert: true)
+            )
         
-        let publicURL = try supabase.storage
+        // Get and return the public URL
+        let publicURL = try self.supabase.storage
             .from(bucket)
             .getPublicURL(path: filePath)
         
@@ -413,7 +430,7 @@ class CollageDBManager {
     }
     
     func uploadCollagePreview(sessionId: UUID, image: UIImage) async throws -> String {
-        let fileName = "\(sessionId.uuidString).png"
+        let fileName = "\(sessionId.uuidString).avif"
         let imageUrl = try await uploadImage(image, bucket: "patchd-storage", folder: "collage-previews", fileName: fileName)
         
         try await updateCollagesessionsPreview(sessionId: sessionId, imageURL: imageUrl)
@@ -424,7 +441,7 @@ class CollageDBManager {
     //MARK: - Realtime subscriptions
     func subscribeToPhotoUpdates(sessionId: UUID, onChange: @escaping ([CollagePhoto]) -> Void) -> Task<Void, Never> {
         return Task {
-            var channel = supabase.channel("photos")
+            let channel = supabase.channel("photos")
                   
             let changes = channel.postgresChange(
                 AnyAction.self,
@@ -447,28 +464,36 @@ class CollageDBManager {
     }
     
     func uploadCutoutImage(sessionId: UUID, image: UIImage) async throws -> String {
-        let fileName = "\(UUID().uuidString).png"
+        let fileName = "\(UUID().uuidString).avif"
         return try await uploadImage(image, bucket: "patchd-storage", folder: "collage-photos", fileName: fileName)
     }
     
     //MARK: - Avatar Functions
 
     func uploadUserAvatar(userId: UUID, image: UIImage) async throws -> String {
-        guard let imageData = image.pngData() else {
-            throw NSError(domain: "DB", code: 400, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to data"])
-        }
+        // Perform AVIF encoding on a background thread
+        let avifEncodedData = try await Task.detached(priority: .userInitiated) {
+            try AVIFEncoder.encode(image: image)
+        }.value
         
-        let filename = "\(userId.uuidString)_\(Date().timeIntervalSince1970).png"
+        let filename = "\(userId.uuidString)_\(Date().timeIntervalSince1970).avif"
         let filePath = "avatars/\(filename)"
         
+        // Upload to Supabase storage
         try await supabase.storage
             .from("patchd-storage")
-            .upload(path: filePath, file: imageData, options: FileOptions(contentType: "image/png"))
+            .upload(
+                filePath,
+                data: avifEncodedData,
+                options: FileOptions(contentType: "image/avif", upsert: true)
+            )
         
+        // Get public URL
         let publicURL = try supabase.storage
             .from("patchd-storage")
             .getPublicURL(path: filePath)
         
+        // Update user record in database
         struct AvatarUpdate: Encodable {
             let avatar_url: String
             let updated_at: String
@@ -493,7 +518,6 @@ class CollageDBManager {
         
         return publicURL.absoluteString
     }
-    
     func joinCollage(collageId: UUID) async throws {
         let user = try await getCurrentUser()
         
@@ -820,5 +844,559 @@ class CollageDBManager {
             .getPublicURL(path: path)
         
         return publicURL.absoluteString
+    }
+    
+    //MARK: - Friendship Functions
+
+    /// Send a friend request
+    func sendFriendRequest(to friendId: UUID) async throws {
+        let user = try await getCurrentUser()
+        
+        // Check if friendship already exists
+        let existing: [Friendship] = try await supabase
+            .from("friendships")
+            .select()
+            .or("user_id.eq.\(user.id.uuidString),friend_id.eq.\(user.id.uuidString)")
+            .or("user_id.eq.\(friendId.uuidString),friend_id.eq.\(friendId.uuidString)")
+            .execute()
+            .value
+        
+        // Check for existing relationship (either direction)
+        let existingRelationship = existing.first { friendship in
+            (friendship.userId == user.id && friendship.friendId == friendId) ||
+            (friendship.userId == friendId && friendship.friendId == user.id)
+        }
+        
+        if let existing = existingRelationship {
+            if existing.status == "rejected" {
+                // If previously rejected, update to pending
+                try await updateFriendshipStatus(friendshipId: existing.id, status: "pending")
+            } else {
+                throw NSError(domain: "DB", code: 409, userInfo: [NSLocalizedDescriptionKey: "Friendship request already exists"])
+            }
+            return
+        }
+        
+        struct FriendshipInsert: Encodable {
+            let user_id: String
+            let friend_id: String
+            let status: String
+            let updated_at: String
+        }
+        
+        let friendshipData = FriendshipInsert(
+            user_id: user.id.uuidString,
+            friend_id: friendId.uuidString,
+            status: "pending",
+            updated_at: ISO8601DateFormatter().string(from: Date())
+        )
+        
+        let _: Friendship = try await supabase
+            .from("friendships")
+            .insert(friendshipData)
+            .select()
+            .single()
+            .execute()
+            .value
+        
+        // Invalidate cache
+        friendshipsCache.removeValue(forKey: user.id)
+        friendshipsCache.removeValue(forKey: friendId)
+        friendshipStatusCache.removeValue(forKey: "\(user.id)-\(friendId)")
+        friendshipStatusCache.removeValue(forKey: "\(friendId)-\(user.id)")
+    }
+
+    /// Accept a friend request
+    func acceptFriendRequest(friendshipId: UUID) async throws {
+        try await updateFriendshipStatus(friendshipId: friendshipId, status: "accepted")
+    }
+
+    /// Reject a friend request
+    func rejectFriendRequest(friendshipId: UUID) async throws {
+        try await updateFriendshipStatus(friendshipId: friendshipId, status: "rejected")
+    }
+
+    /// Update friendship status
+    private func updateFriendshipStatus(friendshipId: UUID, status: String) async throws {
+        struct FriendshipUpdate: Encodable {
+            let status: String
+            let updated_at: String
+        }
+        
+        let updateData = FriendshipUpdate(
+            status: status,
+            updated_at: ISO8601DateFormatter().string(from: Date())
+        )
+        
+        let updatedFriendship: Friendship = try await supabase
+            .from("friendships")
+            .update(updateData)
+            .eq("id", value: friendshipId.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+        
+        // Invalidate cache for both users
+        friendshipsCache.removeValue(forKey: updatedFriendship.userId)
+        friendshipsCache.removeValue(forKey: updatedFriendship.friendId)
+        friendshipStatusCache.removeValue(forKey: "\(updatedFriendship.userId)-\(updatedFriendship.friendId)")
+        friendshipStatusCache.removeValue(forKey: "\(updatedFriendship.friendId)-\(updatedFriendship.userId)")
+    }
+
+    /// Fetch all friendships for the current user
+    func fetchFriendships(status: String? = nil) async throws -> [Friendship] {
+        let user = try await getCurrentUser()
+        
+        // Check cache if fetching all statuses
+        if status == nil, let cached = friendshipsCache[user.id] {
+            return cached
+        }
+        
+        var query = supabase
+            .from("friendships")
+            .select()
+            .or("user_id.eq.\(user.id.uuidString),friend_id.eq.\(user.id.uuidString)")
+        
+        if let status = status {
+            query = query.eq("status", value: status)
+        }
+        
+        let friendships: [Friendship] = try await query
+            .execute()
+            .value
+        
+        // Cache if fetching all statuses
+        if status == nil {
+            friendshipsCache[user.id] = friendships
+        }
+        
+        return friendships
+    }
+
+    /// Fetch friend requests sent to the current user (pending)
+    func fetchPendingFriendRequests() async throws -> [(friendship: Friendship, user: CollageUser)] {
+        let user = try await getCurrentUser()
+        
+        let friendships: [Friendship] = try await supabase
+            .from("friendships")
+            .select()
+            .eq("friend_id", value: user.id.uuidString)
+            .eq("status", value: "pending")
+            .execute()
+            .value
+        
+        // Fetch user details for each request sender
+        var results: [(Friendship, CollageUser)] = []
+        for friendship in friendships {
+            let sender = try await fetchUser(userId: friendship.userId)
+            results.append((friendship, sender))
+        }
+        
+        return results
+    }
+
+    /// Fetch accepted friends with their user details
+    func fetchFriends() async throws -> [CollageUser] {
+        let user = try await getCurrentUser()
+        
+        let friendships: [Friendship] = try await supabase
+            .from("friendships")
+            .select()
+            .or("user_id.eq.\(user.id.uuidString),friend_id.eq.\(user.id.uuidString)")
+            .eq("status", value: "accepted")
+            .execute()
+            .value
+        
+        // Get friend IDs (the other person in each friendship)
+        let friendIds = friendships.map { friendship in
+            friendship.userId == user.id ? friendship.friendId : friendship.userId
+        }
+        
+        guard !friendIds.isEmpty else {
+            return []
+        }
+        
+        // Check which users are already cached
+        let uncachedIds = friendIds.filter { userCache[$0] == nil }
+        
+        // Fetch only uncached users
+        if !uncachedIds.isEmpty {
+            let users: [CollageUser] = try await supabase
+                .from("users")
+                .select()
+                .in("id", values: uncachedIds.map { $0.uuidString })
+                .execute()
+                .value
+            
+            // Cache the newly fetched users
+            users.forEach { userCache[$0.id] = $0 }
+        }
+        
+        // Return all friends from cache
+        return friendIds.compactMap { userCache[$0] }
+    }
+
+    /// Remove a friendship (unfriend)
+    func removeFriendship(friendshipId: UUID) async throws {
+        // Get friendship details before deleting for cache invalidation
+        let friendship: Friendship = try await supabase
+            .from("friendships")
+            .select()
+            .eq("id", value: friendshipId.uuidString)
+            .single()
+            .execute()
+            .value
+        
+        try await supabase
+            .from("friendships")
+            .delete()
+            .eq("id", value: friendshipId.uuidString)
+            .execute()
+        
+        // Invalidate cache
+        friendshipsCache.removeValue(forKey: friendship.userId)
+        friendshipsCache.removeValue(forKey: friendship.friendId)
+        friendshipStatusCache.removeValue(forKey: "\(friendship.userId)-\(friendship.friendId)")
+        friendshipStatusCache.removeValue(forKey: "\(friendship.friendId)-\(friendship.userId)")
+    }
+
+    /// Check friendship status between two users
+    func checkFriendshipStatus(with userId: UUID) async throws -> String? {
+        let currentUser = try await getCurrentUser()
+        
+        // Check cache first
+        let cacheKey = "\(currentUser.id)-\(userId)"
+        if let cached = friendshipStatusCache[cacheKey] {
+            return cached
+        }
+        
+        let friendships: [Friendship] = try await supabase
+            .from("friendships")
+            .select()
+            .or("user_id.eq.\(currentUser.id.uuidString),friend_id.eq.\(currentUser.id.uuidString)")
+            .or("user_id.eq.\(userId.uuidString),friend_id.eq.\(userId.uuidString)")
+            .execute()
+            .value
+        
+        let friendship = friendships.first { friendship in
+            (friendship.userId == currentUser.id && friendship.friendId == userId) ||
+            (friendship.userId == userId && friendship.friendId == currentUser.id)
+        }
+        
+        // Cache the result
+        if let status = friendship?.status {
+            friendshipStatusCache[cacheKey] = status
+            friendshipStatusCache["\(userId)-\(currentUser.id)"] = status
+        }
+        
+        return friendship?.status
+    }
+
+    //MARK: - Collage Invite Functions
+
+    /// Cache for collage invites
+    private var collageInvitesCache: [UUID: [CollageInvite]] = [:] // userId -> invites
+
+    /// Send a collage invite
+    func sendCollageInvite(collageId: UUID, to receiverId: UUID) async throws {
+        let user = try await getCurrentUser()
+        
+        // Verify collage exists and hasn't expired
+        let collage: Collage = try await supabase
+            .from("collages")
+            .select()
+            .eq("id", value: collageId.uuidString)
+            .single()
+            .execute()
+            .value
+        
+        guard collage.expiresAt > Date() else {
+            throw NSError(domain: "DB", code: 410, userInfo: [NSLocalizedDescriptionKey: "This collage has expired"])
+        }
+        
+        // Check if user is already a member
+        let existingMembers: [CollageMember] = try await supabase
+            .from("collage_members")
+            .select()
+            .eq("collage_id", value: collageId.uuidString)
+            .eq("user_id", value: receiverId.uuidString)
+            .execute()
+            .value
+        
+        guard existingMembers.isEmpty else {
+            throw NSError(domain: "DB", code: 409, userInfo: [NSLocalizedDescriptionKey: "User is already a member of this collage"])
+        }
+        
+        // Check for existing invite
+        let existingInvites: [CollageInvite] = try await supabase
+            .from("collage_invites")
+            .select()
+            .eq("collage_id", value: collageId.uuidString)
+            .eq("receiver_id", value: receiverId.uuidString)
+            .execute()
+            .value
+        
+        if let existing = existingInvites.first {
+            if existing.status == "rejected" {
+                // If previously rejected, update to pending
+                try await updateCollageInviteStatus(inviteId: existing.id, status: "pending")
+            } else {
+                throw NSError(domain: "DB", code: 409, userInfo: [NSLocalizedDescriptionKey: "Invite already exists"])
+            }
+            return
+        }
+        
+        struct CollageInviteInsert: Encodable {
+            let collage_id: String
+            let sender_id: String
+            let receiver_id: String
+            let status: String
+            let updated_at: String
+        }
+        
+        let inviteData = CollageInviteInsert(
+            collage_id: collageId.uuidString,
+            sender_id: user.id.uuidString,
+            receiver_id: receiverId.uuidString,
+            status: "pending",
+            updated_at: ISO8601DateFormatter().string(from: Date())
+        )
+        
+        let _: CollageInvite = try await supabase
+            .from("collage_invites")
+            .insert(inviteData)
+            .select()
+            .single()
+            .execute()
+            .value
+        
+        // Invalidate cache
+        collageInvitesCache.removeValue(forKey: receiverId)
+    }
+
+    /// Accept a collage invite
+    func acceptCollageInvite(inviteId: UUID) async throws -> CollageSession {
+        let user = try await getCurrentUser()
+        
+        // Get invite details
+        let invite: CollageInvite = try await supabase
+            .from("collage_invites")
+            .select()
+            .eq("id", value: inviteId.uuidString)
+            .single()
+            .execute()
+            .value
+        
+        guard invite.receiverId == user.id else {
+            throw NSError(domain: "DB", code: 403, userInfo: [NSLocalizedDescriptionKey: "Not authorized to accept this invite"])
+        }
+        
+        // Verify collage hasn't expired
+        let collage: Collage = try await supabase
+            .from("collages")
+            .select()
+            .eq("id", value: invite.collageId.uuidString)
+            .single()
+            .execute()
+            .value
+        
+        guard collage.expiresAt > Date() else {
+            throw NSError(domain: "DB", code: 410, userInfo: [NSLocalizedDescriptionKey: "This collage has expired"])
+        }
+        
+        // Update invite status
+        try await updateCollageInviteStatus(inviteId: inviteId, status: "accepted")
+        
+        // Join the collage
+        try await joinCollage(collageId: invite.collageId)
+        
+        // Return the collage session
+        return try await fetchCollage(collage: collage, user: user)
+    }
+
+    /// Reject a collage invite
+    func rejectCollageInvite(inviteId: UUID) async throws {
+        try await updateCollageInviteStatus(inviteId: inviteId, status: "rejected")
+    }
+
+    /// Update collage invite status
+    private func updateCollageInviteStatus(inviteId: UUID, status: String) async throws {
+        struct CollageInviteUpdate: Encodable {
+            let status: String
+            let updated_at: String
+        }
+        
+        let updateData = CollageInviteUpdate(
+            status: status,
+            updated_at: ISO8601DateFormatter().string(from: Date())
+        )
+        
+        let updatedInvite: CollageInvite = try await supabase
+            .from("collage_invites")
+            .update(updateData)
+            .eq("id", value: inviteId.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+        
+        // Invalidate cache
+        collageInvitesCache.removeValue(forKey: updatedInvite.receiverId)
+    }
+
+    /// Fetch pending collage invites for current user
+    func fetchPendingCollageInvites() async throws -> [(invite: CollageInvite, collage: Collage, sender: CollageUser)] {
+        let user = try await getCurrentUser()
+        
+        let invites: [CollageInvite] = try await supabase
+            .from("collage_invites")
+            .select()
+            .eq("receiver_id", value: user.id.uuidString)
+            .eq("status", value: "pending")
+            .execute()
+            .value
+        
+        // Filter out invites for expired collages and fetch details
+        var results: [(CollageInvite, Collage, CollageUser)] = []
+        
+        for invite in invites {
+            do {
+                let collage: Collage = try await supabase
+                    .from("collages")
+                    .select()
+                    .eq("id", value: invite.collageId.uuidString)
+                    .single()
+                    .execute()
+                    .value
+                
+                // Skip expired collages
+                guard collage.expiresAt > Date() else {
+                    continue
+                }
+                
+                let sender = try await fetchUser(userId: invite.senderId)
+                results.append((invite, collage, sender))
+            } catch {
+                print("Error fetching invite details for \(invite.id): \(error)")
+            }
+        }
+        
+        return results
+    }
+
+    /// Fetch all invites sent by current user for a specific collage
+    func fetchSentCollageInvites(collageId: UUID) async throws -> [(invite: CollageInvite, receiver: CollageUser)] {
+        let user = try await getCurrentUser()
+        
+        let invites: [CollageInvite] = try await supabase
+            .from("collage_invites")
+            .select()
+            .eq("collage_id", value: collageId.uuidString)
+            .eq("sender_id", value: user.id.uuidString)
+            .execute()
+            .value
+        
+        var results: [(CollageInvite, CollageUser)] = []
+        for invite in invites {
+            let receiver = try await fetchUser(userId: invite.receiverId)
+            results.append((invite, receiver))
+        }
+        
+        return results
+    }
+
+    /// Delete a collage invite
+    func deleteCollageInvite(inviteId: UUID) async throws {
+        // Get invite details before deleting for cache invalidation
+        let invite: CollageInvite = try await supabase
+            .from("collage_invites")
+            .select()
+            .eq("id", value: inviteId.uuidString)
+            .single()
+            .execute()
+            .value
+        
+        try await supabase
+            .from("collage_invites")
+            .delete()
+            .eq("id", value: inviteId.uuidString)
+            .execute()
+        
+        // Invalidate cache
+        collageInvitesCache.removeValue(forKey: invite.receiverId)
+    }
+
+    /// Send collage invites to multiple friends at once
+    func sendCollageInvitesToFriends(collageId: UUID, friendIds: [UUID]) async throws {
+        let user = try await getCurrentUser()
+        
+        // Verify collage exists and hasn't expired
+        let collage: Collage = try await supabase
+            .from("collages")
+            .select()
+            .eq("id", value: collageId.uuidString)
+            .single()
+            .execute()
+            .value
+        
+        guard collage.expiresAt > Date() else {
+            throw NSError(domain: "DB", code: 410, userInfo: [NSLocalizedDescriptionKey: "This collage has expired"])
+        }
+        
+        // Send invites concurrently
+        await withTaskGroup(of: Void.self) { group in
+            for friendId in friendIds {
+                group.addTask {
+                    try? await self.sendCollageInvite(collageId: collageId, to: friendId)
+                }
+            }
+        }
+    }
+    
+    //MARK: - User Search Functions
+
+    /// Search users by username or email
+    func searchUsers(query: String, limit: Int = 20) async throws -> [CollageUser] {
+        guard !query.isEmpty else {
+            return []
+        }
+        
+        // Search for users matching username or email (case-insensitive)
+        let results: [CollageUser] = try await supabase
+            .from("users")
+            .select()
+            .or("username.ilike.%\(query)%,email.ilike.%\(query)%")
+            .limit(limit)
+            .execute()
+            .value
+        
+        return results
+    }
+
+    /// Search users by exact username
+    func searchUserByUsername(username: String) async throws -> CollageUser? {
+        let results: [CollageUser] = try await supabase
+            .from("users")
+            .select()
+            .eq("username", value: username)
+            .limit(1)
+            .execute()
+            .value
+        
+        return results.first
+    }
+
+    /// Search users by exact email
+    func searchUserByEmail(email: String) async throws -> CollageUser? {
+        let results: [CollageUser] = try await supabase
+            .from("users")
+            .select()
+            .eq("email", value: email)
+            .limit(1)
+            .execute()
+            .value
+        
+        return results.first
     }
 }

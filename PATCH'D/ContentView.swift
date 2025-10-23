@@ -96,6 +96,10 @@ struct ContentView: View {
                 HomeScreenView()
             case .fullscreen:
                 CollageFullscreenView(session: appState.selectedSession!)
+            case .friendsList:
+                FriendsListView()
+            case .collageInvites:
+                CollageInvitesListView()
             }
         }
         .animation(.easeIn, value: appState.currentState)
