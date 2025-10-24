@@ -68,43 +68,106 @@ struct ContentView: View {
             switch appState.currentState {
             case .onboardingTitle:
                 OnboardingTitleView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .onboardingWelcome:
                 OnboardingWelcome_SignUporLogInView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .onboardingSignUp:
                 OnboardingSignUpView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .onboardingSignIn:
                 OnboardingSignInView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .registrationSuccess:
                 RegistrationSuccessView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .onboarding1:
                 Onboarding1View()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .onboarding2:
                 Onboarding2View()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .onboarding3:
                 Onboarding3View()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .onboarding4:
                 Onboarding4View()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .homeScreen:
                 HomeScreenView()
+                    .transition(.opacity)
             case .homeCollageCarousel:
                 HomeScreenView()
+                    .transition(.opacity)
             case .createCollage:
                 CreateCollageView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
             case .profile:
                 ProfileView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .leading).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .dashboard:
                 HomeScreenView()
+                    .transition(.opacity)
             case .fullscreen:
                 CollageFullscreenView(session: appState.selectedSession!)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .friendsList:
                 FriendsListView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .collageInvites:
                 CollageInvitesListView()
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             case .final:
                 FinalCollageView(session: appState.selectedSession!)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
             }
         }
-        .animation(.easeIn, value: appState.currentState)
+        .animation(.easeInOut(duration: 0.5), value: appState.currentState)
         .environmentObject(appState)
     }
 }

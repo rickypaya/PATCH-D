@@ -10,7 +10,6 @@ import SwiftUI
 // MARK: - Home Screen (Merged Dashboard + Home Screen)
 struct HomeScreenView: View {
     @EnvironmentObject var appState: AppState
-    @State private var showCreateCollageSheet = false
     @State private var showInviteCodeSheet = false
     
     var body: some View {
@@ -37,9 +36,6 @@ struct HomeScreenView: View {
                 createButton
             }
         }
-        .sheet(isPresented: $showCreateCollageSheet) {
-            CreateCollageSheet()
-        }
         .sheet(isPresented: $showInviteCodeSheet) {
             InviteCodeSheet()
         }
@@ -62,17 +58,13 @@ struct HomeScreenView: View {
             // Profile icon
             Button(action: {
                 withAnimation(.easeInOut(duration: 0.5)) {
-                    appState.currentState = .profile
+                    appState.navigateToProfile()
                 }
             }) {
-                Circle()
-                    .fill(Color(red: 0.792, green: 0.322, blue: 0.188)) // CA5230
+                Image("icon-profile")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: 40, height: 40)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .foregroundColor(.white) // FFFFFF
-                            .font(.system(size: 20))
-                    )
             }
             
             Spacer()
@@ -81,21 +73,17 @@ struct HomeScreenView: View {
             Image("Patch'd_logo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(height: 30)
+                .frame(height: 45)
             
             Spacer()
             
             Button(action: {
                 showInviteCodeSheet.toggle()
             }, label: {
-                Circle()
-                    .fill(Color(red: 0.792, green: 0.322, blue: 0.188)) // CA5230
+                Image("icon-join")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: 40, height: 40)
-                    .overlay(
-                        Image(systemName: "link.badge.plus" )
-                            .foregroundColor(.white) // FFFFFF
-                            .font(.system(size: 20))
-                    )
             })
         }
         .padding(.horizontal, 20)
@@ -144,8 +132,8 @@ struct HomeScreenView: View {
                 GridItem(.flexible(), spacing: 16),
                 GridItem(.flexible(), spacing: 16)
             ], spacing: 16) {
-                ForEach(appState.activeSessions) { session in
-                    RealCollagePreviewCard(session: session, photoCount: appState.collagePhotos.count)
+                ForEach(Array(appState.activeSessions.enumerated()), id: \.element.id) { index, session in
+                    RealCollagePreviewCard(session: session, backgroundColor: thumbnailColors[index % thumbnailColors.count], photoCount: appState.collagePhotos.count)
                         .onTapGesture {
                             Task {
                                 await appState.selectCollageSession(session)
@@ -159,31 +147,37 @@ struct HomeScreenView: View {
         }
     }
     
+    // Predefined colors for collage thumbnails in specified order
+    private let thumbnailColors: [Color] = [
+        Color(hex: "DCACAC") as Color, // Light pink
+        Color(hex: "6A5858") as Color, // Dark brown-gray
+        Color(hex: "94B8B9") as Color, // Light blue-gray
+        Color(hex: "E5BFAC") as Color  // Light peach
+    ]
+    
     // MARK: - Create Button
     private var createButton: some View {
         Button(action: {
             withAnimation(.easeInOut(duration: 0.3)) {
-                appState.currentState = .createCollage
+                appState.navigateTo(.createCollage)
             }
         }) {
-            Text("Create")
-                .font(.custom("Sanchez", size: 18))
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(Color(red: 0.220, green: 0.376, blue: 0.243)) // 38603E
-                .cornerRadius(12)
-                .overlay(
-                    // Dotted patched border - 2px inside
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(
-                            Color(red: 0.067, green: 0.224, blue: 0.090), // 113917
-                            style: StrokeStyle(lineWidth: 2, dash: [4, 4])
-                        )
-                        .padding(2)
-                )
-                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            ZStack {
+                // Background image
+                Image("blockbutton-blank-green")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .clipped()
+                
+                // Text overlay
+                Text("Create")
+                    .font(.custom("Sanchez", size: 18))
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .offset(y: -5) // Move text up by 5px total
+            }
         }
         .padding(.horizontal, 40)
         .padding(.bottom, 50)
@@ -194,75 +188,37 @@ struct HomeScreenView: View {
 struct RealCollagePreviewCard: View {
     @EnvironmentObject var appState: AppState
     let session: CollageSession
+    let backgroundColor: Color
+    let photoCount: Int
     @State var preview_url: String?
     @State private var showExpirationAlert = false
-    @State var photoCount: Int
     
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // Collage Preview Image
+        VStack(spacing: 0) {
+            // Top colored rectangle (collage preview)
             previewImageView
             
-            VStack(alignment: .leading, spacing: 8) {
-                // Theme
+            // Bottom text section
+            VStack(alignment: .leading, spacing: 4) {
+                // Collage name
                 Text(session.theme)
                     .font(.custom("Sanchez", size: 16))
-                    .fontWeight(.bold)
-                    .foregroundColor(.black)
+                    .fontWeight(.regular)
+                    .foregroundColor(Color(hex: "000000"))
                     .lineLimit(1)
                 
-//                TimelineView(PeriodicTimelineSchedule(from: Date(), by: 1.0)) { context in
-//                    
-//                    var timerDownStyle : SystemFormatStyle.Timer {
-//                        .timer(countingUpIn: Date()..<session.expiresAt)
-//                    }
-//                    
-//                    Text(session.expiresAt > Date() ? session.expiredAt : "Expired" , format: timerDownStyle)
-//                        .font(.custom("Sanchez", size: 12))
-//                        .foregroundColor(.black.opacity(0.7))
-//                        .onAppear {
-//                            if context.date >= session.expiresAt {
-//                                //Call alert for expired collage
-//                                //show notification on collage in dashboad?
-//                                showExpirationAlert = true
-//                            }
-//                        }
-//                }
-//                
-                HStack {
-                    // Members Count
-                    HStack(spacing: 4) {
-                        Image(systemName: "person.2.fill")
-                            .font(.caption)
-                            .foregroundColor(.black.opacity(0.7))
-                        Text("\(session.members.count)")
-                            .font(.custom("Sanchez", size: 14))
-                            .foregroundColor(.black.opacity(0.7))
-                        
-                        Spacer()
-                        
-                        Text("\(photoCount) photo\(session.photos.count == 1 ? "" : "s")")
-                            .font(.custom("Sanchez", size: 12))
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding(6)
-                            .background(Color.black.opacity(0.7))
-                            .cornerRadius(6)
-                            .padding(6)
-                            .onAppear {
-                                photoCount = session.photos.count
-                            }
-                    }
-                    
-                }
-            
+                // Time remaining
+                Text(timeRemainingText)
+                    .font(.custom("Sanchez", size: 12))
+                    .fontWeight(.regular)
+                    .foregroundColor(Color(hex: "595245"))
+                    .lineLimit(1)
             }
-            .padding(4)
-            .background(Color.white.opacity(0.6))
-            .shadow(color: Color.gray.opacity(0.5), radius: 4, x: 0, y: -2)
-            
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .background(Color.white.opacity(0.8))
+        .background(Color(hex: "FDFBF5"))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         .onAppear {
@@ -288,7 +244,7 @@ struct RealCollagePreviewCard: View {
     private var previewImageView: some View {
         ZStack {
             Rectangle()
-                .fill(Color.gray.opacity(0.3))
+                .fill(backgroundColor)
                 .aspectRatio(1, contentMode: .fit)
                 .cornerRadius(12)
             
@@ -313,36 +269,25 @@ struct RealCollagePreviewCard: View {
                 emptyPreviewView
             }
         }
+        .cornerRadius(12)
     }
     
     private var emptyPreviewView: some View {
-        VStack(spacing: 8) {
-            // Use different colors for each collage frame
-            let colors: [Color] = [
-                Color(red: 0.863, green: 0.675, blue: 0.675), // DCACAC
-                Color(red: 0.416, green: 0.345, blue: 0.345), // 6A5858
-                Color(red: 0.580, green: 0.722, blue: 0.725), // 94B8B9
-                Color(red: 0.898, green: 0.749, blue: 0.675)  // E5BFAC
-            ]
-            
-            let colorIndex = (session.id.hashValue % 4 + 4) % 4
-            let selectedColor = colors[colorIndex]
-            
-            Rectangle()
-                .fill(selectedColor)
-                .aspectRatio(1, contentMode: .fit)
-                .cornerRadius(12)
-                .overlay(
-                    VStack(spacing: 8) {
-                        Image(systemName: "photo.stack")
-                            .font(.system(size: 30))
-                            .foregroundColor(.white.opacity(0.7))
-                        Text("No photos yet")
-                            .font(.custom("Sanchez", size: 12))
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-                )
-        }
+        // Use different colors for each collage frame matching the UI design
+        let colors: [Color] = [
+            Color(hex: "DCACAC"), // Top left - Light pink/beige
+            Color(hex: "6A5858"), // Top right - Dark brown/grey
+            Color(hex: "94B8B9"), // Next row left - Light blue/teal
+            Color(hex: "E5BFAC")  // Next row right - Light peach/orange
+        ]
+        
+        let colorIndex = (session.id.hashValue % 4 + 4) % 4
+        let selectedColor = colors[colorIndex]
+        
+        return Rectangle()
+            .fill(selectedColor)
+            .aspectRatio(1, contentMode: .fit)
+            .cornerRadius(12)
     }
     
     private var timeRemainingText: String {
@@ -368,107 +313,173 @@ struct RealCollagePreviewCard: View {
 struct InviteCodeSheet: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) var dismiss
-    
+
     @State private var inviteCode = ""
     @State private var isJoining = false
     @State private var errorMessage: String?
-    
+
+    // Colors matching the design requirements
+    private var backgroundColor: Color { Color(hex: "F2E2C8") }
+    private var cardBackgroundColor: Color { Color(hex: "FFFAF1") }
+    private var textColor: Color { Color(hex: "38603E") }
+    private var fieldBorderColor: Color { Color(hex: "CCDFD1") }
+    private var fieldBackgroundColor: Color { Color(hex: "FFFFFF") }
+    private var fieldTextColor: Color { Color(hex: "A8C2AE") }
+    private var dottedDetailColor: Color { Color(hex: "EAFAEE") }
+
+    // Match Create Collage button’s dotted border color
+    private var buttonDottedDetailColor: Color { Color(hex: "113917") }
+
     var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                Image(systemName: "link.circle.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.blue)
-                
-                Text("Join a Collage")
-                    .font(.title.bold())
-                
-                Text("Enter the 8-character invite code")
-                    .font(.body)
-                    .foregroundColor(.gray)
-                
-                TextField("Invite Code", text: $inviteCode)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                    .textInputAutocapitalization(.characters)
-                    .autocorrectionDisabled()
-                    .padding(.horizontal)
-                    .onChange(of: inviteCode) {
-                        inviteCode = inviteCode.uppercased()
+        ZStack {
+            backgroundColor.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Spacer().frame(height: 20)
+
+                VStack(spacing: 0) {
+                    Spacer().frame(height: 10)
+
+                    VStack(spacing: 0) {
+                        CheckeredBorder(a: backgroundColor, b: cardBackgroundColor, count: 15, height: 12)
+
+                        VStack(spacing: 24) {
+                            // Top icon, same as Create Collage
+                            Image("photo_stack_icon")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 109, height: 82)
+                                .foregroundColor(textColor)
+
+                            Text("Join Collage")
+                                .font(.custom("Sanchez", size: 28)).fontWeight(.bold)
+                                .foregroundColor(textColor)
+
+                            // Invite Code field (compact 39pt height, same field style)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Invite Code")
+                                    .font(.custom("Sanchez", size: 18)).fontWeight(.bold)
+                                    .foregroundColor(textColor)
+
+                                HStack(spacing: 6) {
+                                    FieldContainer(background: fieldBackgroundColor, border: fieldBorderColor) {
+                                        ZStack(alignment: .leading) {
+                                            if inviteCode.isEmpty {
+                                                Text("Enter 8-character invite code")
+                                                    .font(.custom("Sanchez", size: 16))
+                                                    .foregroundColor(fieldTextColor)
+                                                    .tracking(-0.5)
+                                            }
+                                            TextField("", text: $inviteCode)
+                                                .font(.custom("Sanchez", size: 16))
+                                                .foregroundColor(textColor)
+                                                .tracking(-0.5)
+                                                .textInputAutocapitalization(.characters)
+                                                .autocorrectionDisabled()
+                                                .onChange(of: inviteCode) {
+                                                    // Uppercase and clamp to 8 chars
+                                                    inviteCode = String(inviteCode.uppercased().prefix(8))
+                                                }
+                                        }
+                                    }
+                                    // dotted inner stroke to mirror Create Collage field box
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(dottedDetailColor, style: StrokeStyle(lineWidth: 2, dash: [4,4]))
+                                            .padding(6)
+                                    )
+                                    .frame(maxWidth: 252)
+                                    .frame(height: 39) // <-- compact height
+                                }
+                            }
+
+                            Spacer().frame(height: 5)
+
+                            if let error = errorMessage {
+                                Text(error)
+                                    .font(.custom("Sanchez", size: 14))
+                                    .foregroundColor(.red)
+                                    .multilineTextAlignment(.center)
+                            }
+
+                            // CTA: Join Collage (matches Create Collage button style)
+                            Button(action: joinCollage) {
+                                ZStack {
+                                    Image("blockbutton-blank-green")
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 56)
+                                        .clipped()
+
+                                    if isJoining {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    } else {
+                                        Text("Join Collage")
+                                            .font(.custom("Sanchez", size: 18))
+                                            .fontWeight(.bold)
+                                            .foregroundColor(Color(hex: "FFFFFF")) // white text
+                                            .offset(y: -5) // Move text up by 5px total
+                                    }
+                                }
+                                .cornerRadius(12)
+                            }
+                            .disabled(inviteCode.count != 8 || isJoining)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 32)
+                        .background(cardBackgroundColor)
+
+                        CheckeredBorder(a: backgroundColor, b: cardBackgroundColor, count: 15, height: 12)
                     }
-                
-                if let error = errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
+                    .cornerRadius(20)
+                    .shadow(color: Color.black.opacity(0.25), radius: 4, x: 0, y: 4)
+                    .padding(.horizontal, 16)
+
+                    Spacer().frame(height: 10)
                 }
-                
-                Button(action: joinCollage) {
-                    if isJoining {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    } else {
-                        Text("Join Collage")
-                            .font(.headline)
+
+                Spacer().frame(height: 33)
+            }
+
+            // Back arrow
+            VStack {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "arrow.left")
+                            .foregroundColor(textColor)
+                            .font(.system(size: 24, weight: .medium))
                     }
+                    .padding(.leading, 20)
+                    .padding(.top, 10)
+                    Spacer()
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(inviteCode.count == 8 ? Color.blue : Color.gray)
-                .foregroundColor(.white)
-                .cornerRadius(12)
-                .padding(.horizontal)
-                .disabled(inviteCode.count != 8 || isJoining)
-                
                 Spacer()
             }
-            .padding()
-            .navigationBarItems(trailing: Button("Cancel") {
-                dismiss()
-            })
         }
     }
-    
+
     private func joinCollage() {
         errorMessage = nil
         isJoining = true
-        
         Task {
             await appState.joinCollageWithInviteCode(inviteCode)
             await appState.loadCollageSessions()
             isJoining = false
-            dismiss()
+            
+            // Check if there was an error from AppState
+            if let appError = appState.errorMessage {
+                errorMessage = appError
+            } else {
+                dismiss()
+            }
         }
     }
 }
+
 
 #Preview("Home Screen") {
     HomeScreenView()
-        .environmentObject(AppState.shared)
-}
-
-// MARK: - Preview Wrapper for Navigation Demo
-struct HomeScreenToCreateCollagePreview: View {
-    @StateObject private var appState = AppState.shared
-    
-    var body: some View {
-        ZStack {
-            switch appState.currentState {
-            case .homeScreen:
-                HomeScreenView()
-            case .createCollage:
-                CreateCollageView()
-            default:
-                HomeScreenView()
-            }
-        }
-        .onAppear {
-            // Start with home screen
-            appState.currentState = .homeScreen
-        }
-    }
-}
-
-#Preview("Home Screen → Create Collage Navigation") {
-    HomeScreenToCreateCollagePreview()
         .environmentObject(AppState.shared)
 }

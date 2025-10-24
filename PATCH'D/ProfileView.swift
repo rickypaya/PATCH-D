@@ -21,14 +21,10 @@ struct ProfileView: View {
     @State private var successMessage: String?
     @State private var confirmSignOut = false
     @Environment(\.dismiss) var dismiss
+    
     // Real data for user's contributed collages (both created and joined)
     //corrected to archive data
     private var userContributedCollages: [CollageSession] {
-//        appState.activeSessions.filter { session in
-//            // Show collages where user is either the creator OR a member
-//            session.creator.id == appState.currentUser?.id || 
-//            session.members.contains { $0.id == appState.currentUser?.id }
-//        }
         appState.archive
     }
     
@@ -44,12 +40,22 @@ struct ProfileView: View {
         return uniqueMemberIds.count
     }
     
+    // Predefined colors for collage thumbnails
+    private let thumbnailColors: [Color] = [
+        Color(hex: "94B8B9"), // Light blue-gray
+        Color(hex: "E5BFAC"), // Light peach
+        Color(hex: "EC955B"), // Orange
+        Color(hex: "62B2A1"), // Teal
+        Color(hex: "6A5858"), // Dark brown-gray
+        Color(hex: "E5B154")  // Mustard yellow
+    ]
+    
     @ViewBuilder
     private var avatarView: some View {
         ZStack {
-            // Yellow circle background
+            // Profile avatar background with specified color CA5230
             Circle()
-                .fill(Color.yellow)
+                .fill(Color(hex: "CA5230"))
                 .frame(width: 120, height: 120)
             
             // User's profile image inside
@@ -97,19 +103,20 @@ struct ProfileView: View {
     
     private var topNavigationBar: some View {
         HStack {
-            // Profile icon (left)
-            Button(action:{
-                confirmSignOut = true
-            }, label: {
-                Circle()
-                    .fill(Color.yellow)
+            // Hamburger menu button (left) - dropdown menu
+            Menu {
+                Button("Sign Out") {
+                    Task {
+                        try await appState.signOut()
+                        dismiss()
+                    }
+                }
+            } label: {
+                Image("UIassets/Icon/icon-hamburger")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
                     .frame(width: 40, height: 40)
-                    .overlay(
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.black)
-                            .font(.system(size: 20))
-                    )
-            })
+            }
             
             Spacer()
             
@@ -117,22 +124,21 @@ struct ProfileView: View {
             Image("Patch'd_logo")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(height: 30)
+                .frame(height: 45)
             
             Spacer()
             
-            // Back button -> Right
+            // Back arrow button (right)
             Button(action: {
-                appState.currentState = .dashboard
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    appState.navigateBack()
+                }
             }, label: {
-                Circle()
-                    .fill(Color.yellow)
-                    .frame(width: 40, height: 40)
-                    .overlay(
-                        Image(systemName: "arrowshape.right.circle")
-                            .foregroundColor(.black)
-                            .font(.system(size: 20))
-                    )
+                Image(systemName: "arrow.left")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 24, height: 24)
+                    .foregroundColor(.black)
             })
         }
         .padding(.horizontal, 20)
@@ -141,6 +147,7 @@ struct ProfileView: View {
     
     private var userStatsSection: some View {
         VStack(spacing: 16) {
+<<<<<<< HEAD
             // Username
             Text(username.isEmpty ? "Jericho" : username)
                 .font(.custom("Sanchez", size: 24))
@@ -150,129 +157,128 @@ struct ProfileView: View {
             Text(userEmail)
                 .font(.custom("Sanchez", size: 14))
                 .foregroundColor(.black)
+=======
+            // Profile Name - Sanchez Regular 20, color 000000
+            Text(username.isEmpty ? "Jchung" : username)
+                .font(.custom("Sanchez-Regular", size: 20))
+                .foregroundColor(Color(hex: "000000"))
+>>>>>>> db29439b5817dbb62d54a770cccf7192cb051bae
             
             // Statistics
             HStack(spacing: 40) {
                 // Collages count
                 VStack(spacing: 4) {
                     Text("\(userContributedCollages.count)")
-                        .font(.custom("Sanchez", size: 28))
-                        .fontWeight(.bold)
-                        .foregroundColor(.black)
-                    Text("Archived")
-                        .font(.custom("Sanchez", size: 16))
-                        .foregroundColor(.black.opacity(0.7))
+                        .font(.custom("Sanchez-Regular", size: 20))
+                        .foregroundColor(Color(hex: "000000"))
+                    Text("Collages")
+                        .font(.custom("Sanchez-Regular", size: 10))
+                        .foregroundColor(Color(hex: "9F8860"))
                 }
                 
                 // Divider
                 Rectangle()
-                    .fill(Color.black.opacity(0.3))
+                    .fill(Color(hex: "9F8860").opacity(0.3))
                     .frame(width: 1, height: 40)
                 
-                // Friends count (total unique members across all collages)
-                //will change to some friends list implementation
-                
-                Button(action: {
-                    Task {
-                        appState.currentState = .friendsList
-                    }
-                }) {
-                    VStack(spacing: 4) {
-                        Text("\(appState.friends.count)")
-                            .font(.custom("Sanchez", size: 28))
-                            .fontWeight(.bold)
-                            .foregroundColor(.black)
-                        Text("Friends")
-                            .font(.custom("Sanchez", size: 16))
-                            .foregroundColor(.black.opacity(0.7))
-                    }
+                // Friends count
+                VStack(spacing: 4) {
+                    Text("\(appState.friends.count)")
+                        .font(.custom("Sanchez-Regular", size: 20))
+                        .foregroundColor(Color(hex: "000000"))
+                    Text("Friends")
+                        .font(.custom("Sanchez-Regular", size: 10))
+                        .foregroundColor(Color(hex: "9F8860"))
                 }
-                
-                Rectangle()
-                    .fill(Color.black.opacity(0.3))
-                    .frame(width: 1, height: 40)
-                
-                
-                Button(action: {
-                    Task {
-                        appState.currentState = .collageInvites
-                    }
-                }) {
-                    VStack(spacing: 4) {
-                        Text("\(appState.pendingCollageInvites.count)")
-                            .font(.custom("Sanchez", size: 28))
-                            .fontWeight(.bold)
-                            .foregroundColor(.black)
-                        Text("Invites")
-                            .font(.custom("Sanchez", size: 16))
-                            .foregroundColor(.black.opacity(0.7))
-                    }
-                }
-                
             }
             
-            // Share Profile button
-//            Button(action: {
-//                // TODO: Implement share profile functionality
-//            }) {
-//                Text("Share Profile")
-//                    .font(.custom("Sanchez", size: 18))
-//                    .fontWeight(.bold)
-//                    .foregroundColor(.white)
-//                    .frame(maxWidth: .infinity)
-//                    .frame(height: 50)
-//                    .background(Color.black)
-//                    .cornerRadius(12)
-//            }
-//            .padding(.horizontal, 40)
+            // Share Profile button - using blockbutton-blank-green
+            Button(action: {
+                // TODO: Implement share profile functionality
+            }) {
+                ZStack {
+                    Image("blockbutton-blank-green")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(height: 50)
+                    
+                    VStack {
+                        Text("Share Profile")
+                            .font(.custom("Sanchez-Regular", size: 15))
+                            .fontWeight(.bold)
+                            .foregroundColor(Color(hex: "FFFFFF"))
+                            .padding(.top, 11) // Move text down by 1px more (10+1=11)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                }
+            }
+            .padding(.horizontal, 40)
         }
     }
     
     private var collageGridSection: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
-            ForEach(userContributedCollages.prefix(6), id: \.id) { session in
-                ProfileCollagePreviewCard(session: session)
+            ForEach(0..<min(6, userContributedCollages.count), id: \.self) { index in
+                let session = userContributedCollages[index]
+                ProfileCollagePreviewCard(session: session, backgroundColor: thumbnailColors[index % thumbnailColors.count])
             }
         }
         .padding(.horizontal, 20)
     }
     
     var body: some View {
-        ZStack {
-            // Background with subtle gradient
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.white,
-                    Color(red: 1.0, green: 0.98, blue: 0.9),
-                    Color(red: 1.0, green: 0.95, blue: 0.85)
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                topNavigationBar
+        GeometryReader { geometry in
+            ZStack {
+                // Background with rounded top corners - beige top, cream bottom
+                VStack(spacing: 0) {
+                    // Beige section (EEDDC1) - fills top with rounded corners
+                    Color(hex: "EEDDC1")
+                        .frame(height: geometry.size.height * (150.0 / 744.0)) // Extended beige section
+                        .clipShape(
+                            UnevenRoundedRectangle(
+                                topLeadingRadius: 20,
+                                bottomLeadingRadius: 0,
+                                bottomTrailingRadius: 0,
+                                topTrailingRadius: 20
+                            )
+                        )
+                    
+                    // Cream section (FFFAF1) - fills remaining bottom space
+                    Color(hex: "FFFAF1")
+                        .frame(maxHeight: .infinity) // Fill remaining space
+                }
+                .offset(y: -7) // Move cream background up by 5px more (-2-5=-7)
+                .ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: 30) {
-                        // Avatar section
-                        avatarView
-                            .padding(.top, 20)
-                        
-                        // User stats section
-                        userStatsSection
-                        
-                        // Collage grid section
-                        collageGridSection
-                            .padding(.top, 20)
+                VStack(spacing: 0) {
+                    topNavigationBar
+                    
+                    // Add more spacing to push content down to match UI
+                    Spacer()
+                        .frame(height: 20)
+                    
+                    ScrollView {
+                        VStack(spacing: 30) {
+                            // Avatar section - moved down to be nested within cream background
+                            avatarView
+                                .padding(.top, 40)
+                            
+                            // User stats section
+                            userStatsSection
+                            
+                            // Collage grid section
+                            collageGridSection
+                                .padding(.top, 20)
+                        }
+                        .padding(.bottom, 50)
                     }
-                    .padding(.bottom, 50)
                 }
             }
         }
         .onAppear {
-            username = appState.currentUser?.username ?? "Jericho"
+            username = appState.currentUser?.username ?? "Jchung"
         }
         .confirmationDialog("Add Photo", isPresented: $showImagePicker) {
             Button("Take Photo") {
@@ -303,6 +309,7 @@ struct ProfileView: View {
 struct ProfileCollagePreviewCard: View {
     @EnvironmentObject var appState: AppState
     let session: CollageSession
+    let backgroundColor: Color
     @State var preview_url: String?
     
     var body: some View {
@@ -310,7 +317,7 @@ struct ProfileCollagePreviewCard: View {
             // Thumbnail image with real data
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.gray.opacity(0.3))
+                    .fill(backgroundColor)
                     .frame(height: 100) // Smaller height for Profile View
                 
                 if let previewUrl = preview_url, let url = URL(string: previewUrl) {
@@ -366,7 +373,7 @@ struct ProfileCollagePreviewCard: View {
         }
         .onTapGesture {
             appState.selectedSession = session
-            appState.currentState = .final
+            appState.navigateTo(.fullscreen)
         }
     }
     

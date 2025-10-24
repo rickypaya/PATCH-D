@@ -9,6 +9,7 @@ class AppState: ObservableObject {
     //MARK: - App State Variables
     
     @Published var currentState: CurrState = .onboardingTitle
+    @Published var previousState: CurrState? = nil
     @Published var isAuthenticated = false
     @Published var currentUser: CollageUser?
     @Published var collageMemberships: [UUID] = []
@@ -87,10 +88,16 @@ class AppState: ObservableObject {
             currentUser = try await dbManager.getCurrentUser()
             isAuthenticated = true
         } catch {
-            errorMessage = "Failed to load user: \(error.localizedDescription)"
-            // Don't automatically navigate to onboardingWelcome here
-            // Let the calling function decide the navigation
-            isAuthenticated = false
+            // If user record doesn't exist in custom users table, try to create it
+            do {
+                let session = try await dbManager.getCurrentSession()
+                try await dbManager.createUserRecord(userId: session.user.id, email: session.user.email ?? "")
+                currentUser = try await dbManager.getCurrentUser()
+                isAuthenticated = true
+            } catch {
+                errorMessage = "Failed to load user: \(error.localizedDescription)"
+                isAuthenticated = false
+            }
         }
     }
     
@@ -102,7 +109,7 @@ class AppState: ObservableObject {
         }
         do {
             collageMemberships = try await dbManager.fetchMemberships(userId: currentUser.id)
-            currentState = .dashboard
+            currentState = .homeScreen
         } catch {
             errorMessage = "Failed to load user memberships: \(error.localizedDescription)"
         }
@@ -213,6 +220,33 @@ class AppState: ObservableObject {
         await loadPhotosForSelectedSession()
     }
     
+    //MARK: - Navigation Helpers
+    
+    func navigateTo(_ newState: CurrState) {
+        previousState = currentState
+        currentState = newState
+    }
+    
+    func navigateBack() {
+        if let previous = previousState {
+            currentState = previous
+            previousState = nil
+        } else {
+            // Default fallback to home screen
+            currentState = .homeScreen
+        }
+    }
+    
+    func navigateToHome() {
+        previousState = currentState
+        currentState = .homeScreen
+    }
+    
+    func navigateToProfile() {
+        previousState = currentState
+        currentState = .profile
+    }
+    
     //MARK: - Authentication
     
     func signUpWithEmail(email: String, password: String, username: String) async throws {
@@ -220,7 +254,14 @@ class AppState: ObservableObject {
         errorMessage = nil
         do {
             let authResp = try await dbManager.signUpWithEmail(email: email, password: password)
-            try await dbManager.updateUsername(username: username)
+            
+            // Try to update username, but don't fail if user record doesn't exist yet
+            do {
+                try await dbManager.updateUsername(username: username)
+            } catch {
+                print("Warning: Failed to update username: \(error)")
+                // Continue with authentication even if username update fails
+            }
             
             // Load the current user to set authentication state
             await loadCurrentUser()
@@ -233,6 +274,7 @@ class AppState: ObservableObject {
             currentState = .registrationSuccess
         } catch {
             errorMessage = error.localizedDescription
+            isLoading = false
             throw error
         }
         
@@ -354,7 +396,7 @@ class AppState: ObservableObject {
         if let session = selectedSession, let view = captureView {
             await captureAndUploadPreview(for: session, from: view)
         }
-        currentState = .dashboard
+        currentState = .homeScreen
         stopRealTimeSubscription()
         selectedSession = nil
         collagePhotos = []
@@ -984,8 +1026,15 @@ class AppState: ObservableObject {
             // Cache the session
             sessionCache[session.id] = session
             
+            // Navigate to the collage fullscreen
+            await selectCollageSession(session)
+            
         } catch {
-            errorMessage = "Failed to join collage: \(error.localizedDescription)"
+            if error.localizedDescription.contains("Invalid invite code") {
+                errorMessage = "Enter a valid invite code."
+            } else {
+                errorMessage = "Failed to join collage: \(error.localizedDescription)"
+            }
         }
         
         isLoading = false
