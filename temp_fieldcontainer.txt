@@ -1,0 +1,18 @@
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(background)
+            // Thicker solid border
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(border, lineWidth: 4)
+            // Dotted line detail embedded within the border
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color(hex: "EAFAEE"), style: StrokeStyle(lineWidth: 1, dash: [3,3]))
+                .padding(1.5)
+        }
+        .overlay(
+            inner
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11.5)
+        )
+    }

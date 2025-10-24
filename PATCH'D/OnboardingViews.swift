@@ -754,7 +754,7 @@ struct OnboardingSignUpView: View {
     
     var body: some View {
         ZStack {
-            Color(red: 0.949, green: 0.882, blue: 0.780).ignoresSafeArea()
+            Color(red: 0.949, green: 0.886, blue: 0.784).ignoresSafeArea()
             
             ScrollView {
                 VStack(spacing: 30) {
@@ -821,7 +821,7 @@ struct OnboardingSignUpView: View {
                         }
                     }
                     
-                    Spacer(minLength: 20)
+                    Spacer(minLength: 5)
                     
                     if showGeneralError {
                         Text(generalErrorMessage)
@@ -831,35 +831,38 @@ struct OnboardingSignUpView: View {
                             .padding(.horizontal, 20)
                     }
                     
-                    Spacer(minLength: 10)
+                    Spacer(minLength: 0)
                     
                     Button(action: {
                         Task {
                             await handleSignUp()
                         }
                     }) {
-                        HStack {
-                            if isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
+                        ZStack {
+                            Image("blockbutton-blank-green")
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 56)
+                            
+                            VStack {
+                                HStack {
+                                    if isLoading {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(0.8)
+                                    }
+                                    Text("Create my account")
+                                        .font(.custom("Sanchez", size: 18))
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.top, 8)
+                                Spacer()
                             }
-                            Text("Create my account")
-                                .font(.custom("Sanchez", size: 18))
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(Color(red: 0.220, green: 0.376, blue: 0.243))
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
-                                .foregroundColor(Color(red: 0.078, green: 0.259, blue: 0.102))
-                                .padding(2)
-                        )
-                        .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                     }
                     .disabled(!isFormValid)
                     .opacity(isFormValid ? 1.0 : 0.6)
@@ -931,7 +934,7 @@ struct OnboardingSignInView: View {
     
     var body: some View {
         ZStack {
-            Color(red: 0.949, green: 0.882, blue: 0.780).ignoresSafeArea()
+            Color(red: 0.949, green: 0.886, blue: 0.784).ignoresSafeArea()
             
             ScrollView {
                 VStack(spacing: 30) {
@@ -974,7 +977,7 @@ struct OnboardingSignInView: View {
                         }
                     }
                     
-                    Spacer(minLength: 30)
+                    Spacer(minLength: 10)
                     
                     if showError {
                         Text(errorMessage)
@@ -984,35 +987,38 @@ struct OnboardingSignInView: View {
                             .padding(.horizontal, 20)
                     }
                     
-                    Spacer(minLength: 10)
+                    Spacer(minLength: 0)
                     
                     Button(action: {
                         Task {
                             await handleSignIn()
                         }
                     }) {
-                        HStack {
-                            if isLoading {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(0.8)
+                        ZStack {
+                            Image("blockbutton-blank-green")
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 56)
+                            
+                            VStack {
+                                HStack {
+                                    if isLoading {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(0.8)
+                                    }
+                                    Text("Log in")
+                                        .font(.custom("Sanchez", size: 18))
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                }
+                                .padding(.top, 8)
+                                Spacer()
                             }
-                            Text("Log in")
-                                .font(.custom("Sanchez", size: 18))
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .background(Color(red: 0.204, green: 0.275, blue: 0.494))
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
-                                .foregroundColor(Color(red: 0.075, green: 0.145, blue: 0.365))
-                                .padding(2)
-                        )
-                        .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
                     }
                     .disabled(!isFormValid)
                     .opacity(isFormValid ? 1.0 : 0.6)
@@ -1074,14 +1080,16 @@ struct CustomTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color(red: 0.949, green: 0.882, blue: 0.780))
-            .cornerRadius(8)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                    .foregroundColor(Color(red: 0.8, green: 0.7, blue: 0.6))
+            .padding(.vertical, 16)
+            .offset(y: -4)
+            .background(
+                Image("SignUp_field")
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: 56)
             )
+            .cornerRadius(8)
+            .foregroundColor(Color.black)
             .font(.custom("Sanchez", size: 16))
     }
 }
@@ -1145,7 +1153,57 @@ struct RegistrationSuccessView: View {
 }
 
 // MARK: - Preview
-#Preview {
+#Preview("Complete Onboarding Flow") {
+    ContentView()
+        .environmentObject(AppState.shared)
+}
+
+#Preview("Title Screen") {
+    OnboardingTitleView()
+        .environmentObject(AppState.shared)
+}
+
+#Preview("Welcome Screen") {
+    OnboardingWelcome_SignUporLogInView()
+        .environmentObject(AppState.shared)
+}
+
+#Preview("Sign Up Screen") {
+    OnboardingSignUpView()
+        .environmentObject(AppState.shared)
+}
+
+#Preview("Log In Screen") {
+    OnboardingSignInView()
+        .environmentObject(AppState.shared)
+}
+
+#Preview("Registration Success") {
+    RegistrationSuccessView()
+        .environmentObject(AppState.shared)
+}
+
+#Preview("Onboarding 1") {
+    Onboarding1View()
+        .environmentObject(AppState.shared)
+}
+
+#Preview("Onboarding 2") {
+    Onboarding2View()
+        .environmentObject(AppState.shared)
+}
+
+#Preview("Onboarding 3") {
+    Onboarding3View()
+        .environmentObject(AppState.shared)
+}
+
+#Preview("Onboarding 4") {
+    Onboarding4View()
+        .environmentObject(AppState.shared)
+}
+
+#Preview("Swipe Container") {
     OnboardingSwipeContainer()
         .environmentObject(AppState.shared)
 }

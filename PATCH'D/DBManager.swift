@@ -29,6 +29,10 @@ class CollageDBManager {
         )
     }
     
+    func getCurrentSession() async throws -> Session {
+        return try await supabase.auth.session
+    }
+    
     func getCurrentUser() async throws -> CollageUser {
         let session = try await supabase.auth.session
         let userId = session.user.id
@@ -53,7 +57,51 @@ class CollageDBManager {
     
     func signUpWithEmail(email: String, password: String) async throws -> AuthResponse {
         let authResp = try await supabase.auth.signUp(email: email, password: password)
+        
+        // Create user record in users table after successful auth signup
+        do {
+            try await createUserRecord(userId: authResp.user.id, email: email)
+        } catch {
+            // If user record creation fails, we should still return the auth response
+            // The user can still be authenticated even if the custom user record creation fails
+            print("Warning: Failed to create user record in database: \(error)")
+            // Don't throw here - let the authentication proceed
+        }
+        
         return authResp
+    }
+    
+    func createUserRecord(userId: UUID, email: String) async throws {
+        struct UserInsert: Encodable {
+            let id: String
+            let email: String
+            let username: String
+            let created_at: String
+            let updated_at: String
+        }
+        
+        let userData = UserInsert(
+            id: userId.uuidString,
+            email: email,
+            username: "", // Will be updated later
+            created_at: ISO8601DateFormatter().string(from: Date()),
+            updated_at: ISO8601DateFormatter().string(from: Date())
+        )
+        
+        try await supabase
+            .from("users")
+            .insert(userData)
+            .execute()
+        
+        // Cache the new user
+        let newUser = CollageUser(
+            id: userId,
+            email: email,
+            username: "",
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        userCache[userId] = newUser
     }
     
     func signIn(email: String, password: String) async throws -> Session {

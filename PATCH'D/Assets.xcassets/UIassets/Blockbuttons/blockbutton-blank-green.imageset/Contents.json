@@ -1,23 +1,19 @@
 {
   "images" : [
     {
-      "filename" : "stickerIcon.png",
+      "filename" : "blockbutton-blank-green.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
+      "filename" : "blockbutton-blank-green.png",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
+      "filename" : "blockbutton-blank-green.png",
       "idiom" : "universal",
       "scale" : "3x"
-    },
-    {
-      "filename" : "stickerIcon.svg",
-      "idiom" : "universal",
-      "scale" : "1x",
-      "unassigned" : true
     }
   ],
   "info" : {

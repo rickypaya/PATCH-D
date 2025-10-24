@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "stickerIcon.png",
+      "filename" : "Clipboard - 2025-10-23 12.50.14.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
@@ -12,12 +12,6 @@
     {
       "idiom" : "universal",
       "scale" : "3x"
-    },
-    {
-      "filename" : "stickerIcon.svg",
-      "idiom" : "universal",
-      "scale" : "1x",
-      "unassigned" : true
     }
   ],
   "info" : {
