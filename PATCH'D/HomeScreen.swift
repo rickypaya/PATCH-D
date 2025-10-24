@@ -190,8 +190,12 @@ struct RealCollagePreviewCard: View {
     let session: CollageSession
     let backgroundColor: Color
     let photoCount: Int
-    @State var preview_url: String?
     @State private var showExpirationAlert = false
+    
+    // Computed property that reacts to session changes
+    private var preview_url: String? {
+        session.preview_url
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -221,9 +225,6 @@ struct RealCollagePreviewCard: View {
         .background(Color(hex: "FDFBF5"))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-        .onAppear {
-            preview_url = session.preview_url ?? ""
-        }
         .alert("Collage Expired", isPresented: $showExpirationAlert) {
             Button("View Final Collage", role: .none) {
                 appState.selectedSession = session
@@ -372,7 +373,7 @@ struct InviteCodeSheet: View {
                                             }
                                             TextField("", text: $inviteCode)
                                                 .font(.custom("Sanchez", size: 16))
-                                                .foregroundColor(textColor)
+                                                .foregroundColor(Color(hex: "38603E"))
                                                 .tracking(-0.5)
                                                 .textInputAutocapitalization(.characters)
                                                 .autocorrectionDisabled()

@@ -13,6 +13,28 @@ struct OnboardingSwipeContainer: View {
     @EnvironmentObject var appState: AppState
     @State private var currentPage = 0
     
+    // Function to advance to next page
+    func goToNextPage() {
+        if currentPage < 3 {
+            withAnimation(.easeInOut(duration: 0.5)) {
+                currentPage += 1
+            }
+        }
+    }
+    
+    // Function to go to home screen
+    func goToHomeScreen() {
+        if appState.currentUser != nil && appState.isAuthenticated {
+            withAnimation(.easeInOut(duration: 0.5)) {
+                appState.currentState = .homeScreen
+            }
+        } else {
+            withAnimation(.easeInOut(duration: 0.5)) {
+                appState.currentState = .onboardingSignUp
+            }
+        }
+    }
+    
     var body: some View {
         ZStack {
             // Background color F2E1C7
@@ -39,16 +61,16 @@ struct OnboardingSwipeContainer: View {
                 
                 // Swipeable Content
                 TabView(selection: $currentPage) {
-                    Onboarding1Content(isActive: currentPage == 0)
+                    Onboarding1Content(isActive: currentPage == 0, onNext: goToNextPage)
                         .tag(0)
                     
-                    Onboarding2Content(isActive: currentPage == 1)
+                    Onboarding2Content(isActive: currentPage == 1, onNext: goToNextPage)
                         .tag(1)
                     
-                    Onboarding3Content(isActive: currentPage == 2)
+                    Onboarding3Content(isActive: currentPage == 2, onNext: goToNextPage)
                         .tag(2)
                     
-                    Onboarding4Content(isActive: currentPage == 3)
+                    Onboarding4Content(isActive: currentPage == 3, onNext: goToNextPage, onStartCollaging: goToHomeScreen)
                         .tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
@@ -66,6 +88,7 @@ struct OnboardingSwipeContainer: View {
 struct Onboarding1Content: View {
     @EnvironmentObject var appState: AppState
     let isActive: Bool
+    let onNext: () -> Void
     
     @State private var iconScale: CGFloat = 0.5
     @State private var iconOpacity: Double = 0
@@ -121,11 +144,7 @@ struct Onboarding1Content: View {
             Spacer()
             
             // Next Button
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    appState.currentState = .onboarding2
-                }
-            }) {
+            Button(action: onNext) {
                 Text("Next")
                     .font(.custom("Sanchez", size: 18))
                     .fontWeight(.bold)
@@ -178,6 +197,7 @@ struct Onboarding1Content: View {
 struct Onboarding2Content: View {
     @EnvironmentObject var appState: AppState
     let isActive: Bool
+    let onNext: () -> Void
     
     @State private var iconScale: CGFloat = 0.5
     @State private var iconOpacity: Double = 0
@@ -233,11 +253,7 @@ struct Onboarding2Content: View {
             Spacer()
             
             // Next Button
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    appState.currentState = .onboarding3
-                }
-            }) {
+            Button(action: onNext) {
                 Text("Next")
                     .font(.custom("Sanchez", size: 18))
                     .fontWeight(.bold)
@@ -294,6 +310,7 @@ struct Onboarding2Content: View {
 struct Onboarding3Content: View {
     @EnvironmentObject var appState: AppState
     let isActive: Bool
+    let onNext: () -> Void
     
     @State private var iconScale: CGFloat = 0.8
     @State private var iconOpacity: Double = 0
@@ -343,11 +360,7 @@ struct Onboarding3Content: View {
             Spacer()
             
             // Next Button
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    appState.currentState = .onboarding4
-                }
-            }) {
+            Button(action: onNext) {
                 Text("Next")
                     .font(.custom("Sanchez", size: 18))
                     .fontWeight(.bold)
@@ -407,6 +420,8 @@ struct Onboarding3Content: View {
 struct Onboarding4Content: View {
     @EnvironmentObject var appState: AppState
     let isActive: Bool
+    let onNext: () -> Void
+    let onStartCollaging: () -> Void
     
     @State private var iconScale: CGFloat = 0.5
     @State private var iconOpacity: Double = 0
@@ -461,17 +476,7 @@ struct Onboarding4Content: View {
             Spacer()
             
             // Start Collaging Button
-            Button(action: {
-                if appState.currentUser != nil && appState.isAuthenticated {
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        appState.currentState = .homeScreen
-                    }
-                } else {
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        appState.currentState = .onboardingSignUp
-                    }
-                }
-            }) {
+            Button(action: onStartCollaging) {
                 Text("Start Collaging!")
                     .font(.custom("Sanchez", size: 18))
                     .fontWeight(.bold)

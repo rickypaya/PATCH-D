@@ -148,7 +148,7 @@ struct ThemeDropdown: View {
                                 HStack {
                                     Text(themes[i])
                                         .font(.custom("Sanchez", size: 16))
-                                        .foregroundColor(.black)
+                                        .foregroundColor(Color(hex: "38603E"))
                                     Spacer()
                                     if selectionIndex == i {
                                         Image(systemName: "checkmark")
@@ -331,7 +331,7 @@ struct CreateCollageView: View {
                                                 }
                                                 TextField("", text: $themeInput)
                                                     .font(.custom("Sanchez", size: 16))
-                                                    .foregroundColor(Color(hex: "A8C2AE"))
+                                                    .foregroundColor(Color(hex: "38603E"))
                                                     .tracking(-0.5)
                                                     .onTapGesture { if selectedThemeIndex != nil { selectedThemeIndex = nil } }
                                             }
@@ -502,7 +502,7 @@ struct CreateCollageView: View {
                                             }
                                             TextField("", text: $themeInput)
                                                 .font(.custom("Sanchez", size: 16))
-                                                .foregroundColor(Color(hex: "A8C2AE"))
+                                                .foregroundColor(Color(hex: "38603E"))
                                                 .tracking(-0.5)
                                                 .disabled(isPartyMode)
                                                 .onTapGesture { if selectedThemeIndex != nil { selectedThemeIndex = nil } }
@@ -636,15 +636,12 @@ struct CreateCollageView: View {
             ? (predefinedThemes.randomElement() ?? "Party Time 🎉")
             : themeInput.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            await appState.createNewCollageSession(
+            if let newSession = await appState.createNewCollageSession(
                 theme: theme,
                 duration: selectedDuration,
                 isPartyMode: isPartyMode
-            )
-            await appState.loadCollageSessions()
-            
-            // Select the newly created session and navigate to fullscreen
-            if let newSession = appState.activeSessions.last {
+            ) {
+                // Select the newly created session and navigate to fullscreen
                 await appState.selectCollageSession(newSession)
                 withAnimation(.easeInOut(duration: 0.3)) {
                     appState.navigateTo(.fullscreen)
@@ -661,15 +658,12 @@ struct CreateCollageView: View {
 
         Task {
             let randomTheme = predefinedThemes.randomElement() ?? "Party Time 🎉"
-            await appState.createNewCollageSession(
+            if let newSession = await appState.createNewCollageSession(
                 theme: randomTheme,
                 duration: selectedDuration,
                 isPartyMode: true
-            )
-            await appState.loadCollageSessions()
-            
-            // Select the newly created session and navigate to fullscreen
-            if let newSession = appState.activeSessions.last {
+            ) {
+                // Select the newly created session and navigate to fullscreen
                 await appState.selectCollageSession(newSession)
                 withAnimation(.easeInOut(duration: 0.3)) {
                     appState.navigateTo(.fullscreen)
@@ -871,15 +865,12 @@ struct CreateCollage_PartyModeView: View {
 
         Task {
             let randomTheme = predefinedThemes.randomElement() ?? "Party Time 🎉"
-            await appState.createNewCollageSession(
+            if let newSession = await appState.createNewCollageSession(
                 theme: randomTheme,
                 duration: selectedDuration,
                 isPartyMode: true
-            )
-            await appState.loadCollageSessions()
-            
-            // Select the newly created session and navigate to fullscreen
-            if let newSession = appState.activeSessions.last {
+            ) {
+                // Select the newly created session and navigate to fullscreen
                 await appState.selectCollageSession(newSession)
                 withAnimation(.easeInOut(duration: 0.3)) {
                     appState.navigateTo(.fullscreen)

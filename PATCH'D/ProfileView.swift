@@ -112,7 +112,7 @@ struct ProfileView: View {
                     }
                 }
             } label: {
-                Image("UIassets/Icon/icon-hamburger")
+                Image("icon-hamburger")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 40, height: 40)
@@ -310,7 +310,11 @@ struct ProfileCollagePreviewCard: View {
     @EnvironmentObject var appState: AppState
     let session: CollageSession
     let backgroundColor: Color
-    @State var preview_url: String?
+    
+    // Computed property that reacts to session changes
+    private var preview_url: String? {
+        session.preview_url
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -367,9 +371,6 @@ struct ProfileCollagePreviewCard: View {
                 .foregroundColor(.black)
                 .lineLimit(1)
                 .padding(.top, 4)
-        }
-        .onAppear {
-            preview_url = session.preview_url ?? ""
         }
         .onTapGesture {
             appState.selectedSession = session
