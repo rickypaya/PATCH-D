@@ -24,6 +24,7 @@ struct CollageFullscreenView: View {
     @State private var showCopyAlert = false
     @State private var showMembersList = false
     @State private var isExpired = false
+    @State private var timeRemaining: TimeInterval = 0
 
     
     
@@ -64,39 +65,6 @@ struct CollageFullscreenView: View {
     
     // MARK: - Overlays
 
-   private var topToolbarOverlay: some View {
-       Group {
-           if !clearToolbar && !isExpired {
-               TopToolbarView(
-                   onClose: handleClose,
-                   onCopyCode: handleCopyCode,
-                   onAddSticker: { showStickerLibrary = true },
-                   onPaste: { Task { await handlePasteAction(in: canvasSize) } },
-                   onAddPhoto: { showImageSourcePicker = true },
-                   showMenuDropdown: $showMenuDropdown,
-                   clearToolbar: clearToolbar,
-                   session: session,
-                   expirationDate: session.expiresAt,
-                   isExpired: $isExpired
-               )
-           }
-       }
-   }
-
-   private var bottomToolbarOverlay: some View {
-       Group {
-           if !clearToolbar && !isExpired {
-               BottomToolbarView(
-                   members: appState.collageMembers,
-                   isOverTrash: isOverTrash,
-                   onTrashFrameChange: { frame in trashIconFrame = frame },
-                   onMembersPressed: { showMembersList = true },
-                   clearToolbar: clearToolbar
-               )
-           }
-       }
-   }
-
    private var copyAlertOverlay: some View {
        Group {
            if showCopyAlert {
@@ -112,7 +80,10 @@ struct CollageFullscreenView: View {
 
     private func onAppear() {
         initializePhotoStates()
-        Task { await appState.loadCollageMembersForSession(collage_id: session.id) }
+        Task { 
+            await appState.loadCollageMembersForSession(collage_id: session.id)
+            await appState.loadPhotosForSelectedSession()
+        }
     }
 
     // MARK: - Toolbar Actions
@@ -120,13 +91,9 @@ struct CollageFullscreenView: View {
     private func handleClose() {
         Task {
             clearToolbar = true
-            try? await Task.sleep(nanoseconds: 100_000_000)
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first,
-               let rootView = window.rootViewController?.view {
-                await appState.deselectCollageSession(captureView: rootView)
-            }
-            dismiss()
+            
+            // Navigate immediately for better UX
+            await appState.deselectCollageSession(captureView: nil)
         }
     }
 
@@ -142,7 +109,11 @@ struct CollageFullscreenView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                canvasBackground
+                // White background
+                Color.white
+                    .ignoresSafeArea()
+                
+                // Collage photos canvas
                 collagePhotosView(geometry)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(Rectangle())
@@ -152,10 +123,164 @@ struct CollageFullscreenView: View {
                             clearToolbar.toggle()
                         }
                     }
+                
+                // Top-left: Close/Save button
+                VStack {
+                    HStack {
+                        Button(action: handleClose) {
+                            Image("icon-quit")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 40, height: 40)
+                        }
+                        .padding(.leading, 20)
+                        .padding(.top, 60) // Moved down to avoid dynamic island
+                        
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                
+                // Top center: Collage name and countdown timer
+                VStack {
+                    HStack {
+                        Spacer()
+                        
+                        VStack(spacing: 8) {
+                            // Collage name
+                            Text(session.theme)
+                                .font(.custom("Sanchez", size: 20))
+                                .foregroundColor(Color.black)
+                            
+                            // Countdown timer
+                            TimelineView(.periodic(from: Date(), by: 1.0)) { context in
+                                let remaining = session.expiresAt.timeIntervalSince(context.date)
+                                Text(formatTimeRemaining(remaining))
+                                    .font(.custom("Sanchez", size: 12))
+                                    .foregroundColor(Color.black)
+                                    .onAppear {
+                                        timeRemaining = remaining
+                                        if remaining <= 0 {
+                                            isExpired = true
+                                        }
+                                    }
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 64) // Moved down 2px more from X icon and ellipsis icon
+                    
+                    Spacer()
+                }
+                
+                // Top-right: Ellipsis menu and sticker button
+                VStack {
+                    HStack {
+                        Spacer()
+                        
+                        VStack(spacing: 12) {
+                            // Ellipsis menu button
+                            Menu {
+                                Button(action: { showImageSourcePicker = true }) {
+                                    Label("Add Photo", systemImage: "plus")
+                                }
+                                Button(action: handleCopyCode) {
+                                    Label("Copy Invite Code", systemImage: "document.on.document")
+                                }
+                                Button(action: { Task { await handlePasteAction(in: canvasSize) } }) {
+                                    Label("Paste", systemImage: "doc.on.clipboard")
+                                }
+                            } label: {
+                                Image("icon-ellipsis")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 40, height: 40)
+                            }
+                            
+                            // Sticker library button
+                            Button(action: { showStickerLibrary = true }) {
+                                Image("icon-sticker")
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 40, height: 40)
+                            }
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.top, 60) // Moved down to avoid dynamic island
+                    }
+                    Spacer()
+                }
+                
+                // Bottom-left: Collaborating users' profile avatars
+                VStack {
+                    Spacer()
+                    
+                    HStack(alignment: .bottom) {
+                        Button(action: { showMembersList = true }) {
+                            HStack(spacing: -6) {
+                                ForEach(Array(appState.collageMembers.prefix(4).enumerated()), id: \.element.id) { index, member in
+                                    RoundedRectangle(cornerRadius: 43.5)
+                                        .fill(profileAvatarColor(for: index))
+                                        .frame(width: 50, height: 50)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 43.5)
+                                                .stroke(Color(hex: "FFF9F7"), lineWidth: 2)
+                                        )
+                                        .overlay(
+                                            AsyncImage(url: URL(string: member.avatarUrl ?? "")) { image in
+                                                image
+                                                    .resizable()
+                                                    .scaledToFill()
+                                            } placeholder: {
+                                                Image(systemName: "person.fill")
+                                                    .foregroundColor(.white)
+                                                    .font(.system(size: 20))
+                                            }
+                                            .frame(width: 46, height: 46)
+                                            .clipShape(RoundedRectangle(cornerRadius: 43.5))
+                                        )
+                                        .shadow(color: Color.black.opacity(0.25), radius: 4, x: 0, y: 4)
+                                }
+                            }
+                        }
+                        .padding(.leading, 24)
+                        .padding(.bottom, 24)
+                        
+                        Spacer()
+                    }
+                }
+                
+                // Bottom-right: Trash icon for photo removal (aligned with profile avatars)
+                VStack {
+                    Spacer()
+                    
+                    HStack(alignment: .bottom) {
+                        Spacer()
+                        
+                        Image("icon-trash")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: isOverTrash ? 60 : 50, height: isOverTrash ? 60 : 50)
+                            .foregroundColor(.black)
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.onAppear {
+                                    onTrashFrameChange(geo.frame(in: .global))
+                                }
+                                .onChange(of: geo.frame(in: .global)) { _, newFrame in
+                                    onTrashFrameChange(newFrame)
+                                }
+                            }
+                        )
+                        .scaleEffect(isOverTrash ? 1.2 : 1.0)
+                        .animation(.spring(response: 0.3), value: isOverTrash)
+                        .padding(.trailing, 24)
+                        .padding(.bottom, 24)
+                    }
+                }
             }
         }
-        .overlay(topToolbarOverlay,alignment: .top)
-        .overlay(bottomToolbarOverlay, alignment: .bottom)
         .overlay(copyAlertOverlay, alignment: .top)
         .ignoresSafeArea(.all)
         .navigationBarHidden(true)
@@ -201,6 +326,30 @@ struct CollageFullscreenView: View {
                 await appState.captureExpiredSession(captureView: rootView)
             }
         }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func formatTimeRemaining(_ timeInterval: TimeInterval) -> String {
+        let hours = Int(timeInterval) / 3600
+        let minutes = Int(timeInterval) % 3600 / 60
+        let seconds = Int(timeInterval) % 60
+        
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+    
+    private func profileAvatarColor(for index: Int) -> Color {
+        let colors = [
+            Color(hex: "EB9982"), // Profile 1: Light peach/salmon
+            Color(hex: "43170B"), // Profile 2: Dark brown
+            Color(hex: "869BD2"), // Profile 3: Light blue/periwinkle
+            Color(hex: "86D2A8")  // Profile 4: Light mint green
+        ]
+        return colors[index % colors.count]
+    }
+    
+    private func onTrashFrameChange(_ frame: CGRect) {
+        trashIconFrame = frame
     }
     
     // MARK: - Paste Handling
@@ -407,176 +556,115 @@ struct CopyAlertView: View {
     }
 }
 
-// MARK: - Top Toolbar View
-struct TopToolbarView: View {
-    let onClose: () -> Void
-    let onCopyCode: () -> Void
-    let onAddSticker: () -> Void
-    let onPaste: () -> Void
-    let onAddPhoto: () -> Void
-    @Binding var showMenuDropdown: Bool
-    let clearToolbar: Bool
-    let session: CollageSession
-    let expirationDate: Date
-    @Binding var isExpired: Bool
-    @EnvironmentObject var appState: AppState
-    
-    var body: some View {
-        ZStack {
-            HStack {
-                // Close Button
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(Color.black.opacity(0.6))
-                        .clipShape(Circle())
-                }
-                
-                Spacer()
-                
-                VStack {
-                    Text(session.theme)
-                        .font(.system(size: 24))
-                    
-                    TimelineView(.periodic(from: Date(), by: 1.0)) { context in
-                        
-                        var timerDownStyle : SystemFormatStyle.Timer {
-                            .timer(countingUpIn: Date()..<session.expiresAt)
-                        }
-                        
-                        Text(session.expiresAt, format: timerDownStyle)
-                            .font(.custom("Sanchez", size: 12))
-                            .foregroundColor(.black.opacity(0.7))
-                            .onAppear {
-                                if context.date >= session.expiresAt {
-                                    //Call alert for expired collage
-                                    //show notification on collage in dashboad?
-                                    isExpired = true
-                                }
-                            }
-                    }
-                }
-                
-                Spacer()
-                
-                // Menu Button
-                Menu {
-                    Button(action: onAddSticker) {
-                        Label("Add Sticker", systemImage: "face.smiling")
-                    }
-                    
-                    Button(action: onCopyCode) {
-                        Label("Copy Invite Code", systemImage: "document.on.document")
-                    }
-                    
-                    Button(action: onPaste) {
-                        Label("Paste", systemImage: "doc.on.clipboard")
-                    }
-                    
-                    Button(action: onAddPhoto) {
-                        Label("Add Photo", systemImage: "plus")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(Color.blue.opacity(0.8))
-                        .clipShape(Circle())
-                }
-            }
-            .padding()
-            .frame(height: 120)
-        }
-        .padding(.top, 16)
-    }
-    
+// MARK: - Preview
+#Preview("Collage FullScreen View") {
+    CollageFullscreenView(session: CollageSession(
+        id: UUID(),
+        collage: Collage(
+            id: UUID(),
+            theme: "Sunset Vibes 🌅",
+            createdBy: UUID(),
+            inviteCode: "ABC123",
+            startsAt: Date(),
+            expiresAt: Date().addingTimeInterval(3600), // 1 hour from now
+            createdAt: Date(),
+            updatedAt: Date(),
+            backgroundUrl: nil,
+            previewUrl: nil,
+            isPartyMode: false
+        ),
+        creator: CollageUser(
+            id: UUID(),
+            email: "creator@example.com",
+            username: "Creator",
+            avatarUrl: nil,
+            createdAt: Date(),
+            updatedAt: nil
+        ),
+        members: [
+            CollageUser(
+                id: UUID(),
+                email: "user1@example.com",
+                username: "User1",
+                avatarUrl: nil,
+                createdAt: Date(),
+                updatedAt: nil
+            ),
+            CollageUser(
+                id: UUID(),
+                email: "user2@example.com",
+                username: "User2",
+                avatarUrl: nil,
+                createdAt: Date(),
+                updatedAt: nil
+            ),
+            CollageUser(
+                id: UUID(),
+                email: "user3@example.com",
+                username: "User3",
+                avatarUrl: nil,
+                createdAt: Date(),
+                updatedAt: nil
+            ),
+            CollageUser(
+                id: UUID(),
+                email: "user4@example.com",
+                username: "User4",
+                avatarUrl: nil,
+                createdAt: Date(),
+                updatedAt: nil
+            )
+        ],
+        photos: []
+    ))
+    .environmentObject(AppState.preview())
 }
 
-// MARK: - Bottom Toolbar View
-struct BottomToolbarView: View {
-    let members: [CollageUser]
-    let isOverTrash: Bool
-    let onTrashFrameChange: (CGRect) -> Void
-    let onMembersPressed: () -> Void
-    let clearToolbar: Bool
-    
-    var body: some View {
-        HStack(alignment: .bottom) {
-            // Active Members Preview (limited to 3)
-            Button(action: onMembersPressed) {
-                HStack(spacing: -8) {
-                    ForEach(members.prefix(3)) { member in
-                        AsyncImage(url: URL(string: member.avatarUrl ?? "")) { image in
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        } placeholder: {
-                            Image(systemName: "person.circle.fill")
-                                .resizable()
-                                .foregroundColor(.gray)
-                        }
-                        .frame(width: 40, height: 40)
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                    }
-                    
-                    // Show count if more than 3 members
-                    if members.count > 3 {
-                        ZStack {
-                            Circle()
-                                .fill(Color.blue.opacity(0.8))
-                                .frame(width: 40, height: 40)
-                            
-                            Text("+\(members.count - 3)")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                        }
-                        .overlay(Circle().stroke(Color.white, lineWidth: 2))
-                    }
-                }
-                .padding(.horizontal, 16)
-            }
-            
-            Spacer()
-            
-            // Trash Icon for Delete
-            ZStack {
-                Circle()
-                    .fill(isOverTrash ? Color.red.opacity(0.9) : Color.red.opacity(0.6))
-                    .frame(width: 60, height: 60)
-                
-                Image(systemName: isOverTrash ? "trash.fill" : "trash")
-                    .font(.system(size: 24, weight: .semibold))
-                    .foregroundColor(.white)
-            }
-            .background(
-                GeometryReader { geo in
-                    Color.clear.onAppear {
-                        onTrashFrameChange(geo.frame(in: .global))
-                    }
-                    .onChange(of: geo.frame(in: .global)) { _, newFrame in
-                        onTrashFrameChange(newFrame)
-                    }
-                }
+#Preview("Collage FullScreen View - Party Mode") {
+    CollageFullscreenView(session: CollageSession(
+        id: UUID(),
+        collage: Collage(
+            id: UUID(),
+            theme: "MYSTERY",
+            createdBy: UUID(),
+            inviteCode: "PARTY456",
+            startsAt: Date(),
+            expiresAt: Date().addingTimeInterval(1800), // 30 minutes from now
+            createdAt: Date(),
+            updatedAt: Date(),
+            backgroundUrl: nil,
+            previewUrl: nil,
+            isPartyMode: true
+        ),
+        creator: CollageUser(
+            id: UUID(),
+            email: "partycreator@example.com",
+            username: "PartyCreator",
+            avatarUrl: nil,
+            createdAt: Date(),
+            updatedAt: nil
+        ),
+        members: [
+            CollageUser(
+                id: UUID(),
+                email: "partyuser1@example.com",
+                username: "PartyUser1",
+                avatarUrl: nil,
+                createdAt: Date(),
+                updatedAt: nil
+            ),
+            CollageUser(
+                id: UUID(),
+                email: "partyuser2@example.com",
+                username: "PartyUser2",
+                avatarUrl: nil,
+                createdAt: Date(),
+                updatedAt: nil
             )
-            .padding(.trailing, 16)
-            .scaleEffect(isOverTrash ? 1.2 : 1.0)
-            .animation(.spring(response: 0.3), value: isOverTrash)
-        }
-        .padding(.bottom, 40)
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [Color.clear, Color.black.opacity(0.6)]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 150)
-            .ignoresSafeArea(edges: .bottom)
-        )
-    }
+        ],
+        photos: []
+    ))
+    .environmentObject(AppState.preview())
 }
+
 
