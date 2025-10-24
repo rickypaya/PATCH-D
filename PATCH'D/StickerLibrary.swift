@@ -10,7 +10,7 @@ struct StickerLibraryView: View {
     @StateObject private var stickerManager = StickerManager.shared
     @Environment(\.dismiss) var dismiss
     
-    @State private var selectedCategory: String = "General"
+    @State private var selectedCategory: String = ""
     
     let onStickerSelected: (String) -> Void
     
@@ -51,20 +51,38 @@ struct StickerLibraryView: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     Spacer()
                 } else if let selectedCat = stickerManager.categories.first(where: { $0.name == selectedCategory }) {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(selectedCat.stickers) { sticker in
-                                StickerThumbnail(sticker: sticker) {
-                                    onStickerSelected(sticker.url)
-                                    dismiss()
+                    if selectedCat.stickers.isEmpty {
+                        // Show empty state for categories with no stickers
+                        Spacer()
+                        VStack(spacing: 16) {
+                            Image(systemName: "photo.stack")
+                                .font(.system(size: 48))
+                                .foregroundColor(.gray.opacity(0.6))
+                            Text("No stickers available")
+                                .font(.headline)
+                                .foregroundColor(.gray)
+                            Text("Check back later for new stickers")
+                                .font(.subheadline)
+                                .foregroundColor(.gray.opacity(0.8))
+                        }
+                        Spacer()
+                    } else {
+                        ScrollView {
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(selectedCat.stickers) { sticker in
+                                    StickerThumbnail(sticker: sticker) {
+                                        onStickerSelected(sticker.url)
+                                        dismiss()
+                                    }
                                 }
                             }
+                            .padding()
                         }
-                        .padding()
                     }
                 } else {
+                    // Fallback case - should not happen with proper category selection
                     Spacer()
-                    Text("No stickers in this category")
+                    Text("No categories available")
                         .foregroundColor(.gray)
                     Spacer()
                 }
@@ -78,6 +96,17 @@ struct StickerLibraryView: View {
                         dismiss()
                     }
                     .foregroundColor(.blue)
+                }
+            }
+            .onAppear {
+                // Set the first category as selected when categories are loaded
+                if selectedCategory.isEmpty && !stickerManager.categories.isEmpty {
+                    // Prioritize Food category first, then fall back to first available category
+                    if let foodCategory = stickerManager.categories.first(where: { $0.name == "Food" }) {
+                        selectedCategory = foodCategory.name
+                    } else {
+                        selectedCategory = stickerManager.categories.first?.name ?? ""
+                    }
                 }
             }
         }

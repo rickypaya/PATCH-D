@@ -75,6 +75,33 @@ struct CollageFullscreenView: View {
            }
        }
    }
+   
+   private var uploadProgressOverlay: some View {
+       Group {
+           if appState.isLoading {
+               ZStack {
+                   Color.black.opacity(0.3)
+                       .ignoresSafeArea()
+                   
+                   VStack(spacing: 16) {
+                       ProgressView()
+                           .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                           .scaleEffect(1.5)
+                       
+                       Text("Uploading photo...")
+                           .font(.custom("Sanchez", size: 16))
+                           .foregroundColor(.white)
+                           .fontWeight(.medium)
+                   }
+                   .padding(24)
+                   .background(Color.black.opacity(0.7))
+                   .cornerRadius(12)
+               }
+               .transition(.opacity)
+               .animation(.easeInOut(duration: 0.3), value: appState.isLoading)
+           }
+       }
+   }
 
     // MARK: - Lifecycle
 
@@ -282,6 +309,7 @@ struct CollageFullscreenView: View {
             }
         }
         .overlay(copyAlertOverlay, alignment: .top)
+        .overlay(uploadProgressOverlay, alignment: .center)
         .ignoresSafeArea(.all)
         .navigationBarHidden(true)
         .onAppear(perform: onAppear)
@@ -407,11 +435,30 @@ struct CollageFullscreenView: View {
         let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
         
         Task {
-//            await appState.addPhotoFromImage(image, at: centerPoint)
-            let imageUrl = try await appState.uploadPhotoToStorage(image)
-            guard let url = URL(string: imageUrl) else { return }
-            await appState.addPhotoToCollage(url, at: centerPoint)
-            selectedImage = nil
+            do {
+                // Show immediate feedback by adding a placeholder
+                await MainActor.run {
+                    // You could add a temporary placeholder photo here
+                }
+                
+                // Upload the photo
+                let imageUrl = try await appState.uploadPhotoToStorage(image)
+                guard let url = URL(string: imageUrl) else { return }
+                
+                // Add to collage
+                await appState.addPhotoToCollage(url, at: centerPoint)
+                
+                // Clear selection
+                await MainActor.run {
+                    selectedImage = nil
+                }
+            } catch {
+                await MainActor.run {
+                    selectedImage = nil
+                    // Handle error - could show an alert
+                    print("Failed to upload photo: \(error)")
+                }
+            }
         }
     }
     

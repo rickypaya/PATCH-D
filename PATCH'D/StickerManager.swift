@@ -63,20 +63,37 @@ class StickerManager: ObservableObject {
         for (name, folder) in categoryFolders {
             do {
                 let stickers = try await fetchStickersFromFolder(folder: folder, categoryName: name)
-                if !stickers.isEmpty {
-                    var category = StickerCategory(name: name, folderName: folder)
-                    category.stickers = stickers
+                var category = StickerCategory(name: name, folderName: folder)
+                category.stickers = stickers
+                
+                // Always include Food category, even if empty
+                // For other categories, only include if they have stickers
+                if name == "Food" || !stickers.isEmpty {
                     loadedCategories.append(category)
                 }
             } catch {
                 print("Failed to load category \(name): \(error)")
+                
+                // Still include Food category even if loading failed
+                if name == "Food" {
+                    let emptyCategory = StickerCategory(name: name, folderName: folder)
+                    loadedCategories.append(emptyCategory)
+                }
             }
         }
         
-        // Sort: General first, then alphabetically
+        // Sort: Food first, then by sticker count (most to least), then alphabetically
         loadedCategories.sort { cat1, cat2 in
-            if cat1.name == "General" { return true }
-            if cat2.name == "General" { return false }
+            // Food category always comes first
+            if cat1.name == "Food" { return true }
+            if cat2.name == "Food" { return false }
+            
+            // Sort by sticker count (most to least)
+            if cat1.stickers.count != cat2.stickers.count {
+                return cat1.stickers.count > cat2.stickers.count
+            }
+            
+            // If sticker counts are equal, sort alphabetically
             return cat1.name < cat2.name
         }
         

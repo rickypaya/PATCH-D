@@ -878,6 +878,19 @@ struct OnboardingSignUpView: View {
                             .foregroundColor(.black)
                     }
                     
+                    #if DEBUG
+                    Button(action: {
+                        Task {
+                            await appState.testSignUpProcess()
+                        }
+                    }) {
+                        Text("🔍 Test Database Connection")
+                            .font(.custom("Sanchez", size: 12))
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.top, 10)
+                    #endif
+                    
                     Spacer(minLength: 50)
                 }
                 .padding(.horizontal, 40)
