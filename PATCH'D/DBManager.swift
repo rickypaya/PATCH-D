@@ -781,6 +781,23 @@ class CollageDBManager {
             .execute()
             .value
         
+        print("DEBUG: fetchAllSessions - Found \(collages.count) collages")
+        print("DEBUG: fetchAllSessions - Collage IDs: \(collages.map { $0.id.uuidString })")
+        print("DEBUG: fetchAllSessions - Collage themes: \(collages.map { $0.theme })")
+        
+        // Check specifically for the Grad picsss collage
+        let targetId = UUID(uuidString: "4cd1e93f-1c82-406e-bb47-d8536f2ff671")
+        if let targetId = targetId {
+            let foundCollage = collages.first { $0.id == targetId }
+            if let collage = foundCollage {
+                print("DEBUG: Found 'Grad picsss' collage in database")
+                print("DEBUG: Theme: \(collage.theme)")
+                print("DEBUG: Expires at: \(collage.expiresAt)")
+                print("DEBUG: Is expired: \(collage.expiresAt < Date())")
+            } else {
+                print("DEBUG: 'Grad picsss' collage NOT found in database query")
+            }
+        }
         
         let now = Date()
         var activeSessions: [CollageSession] = []
@@ -869,6 +886,13 @@ class CollageDBManager {
     }
     
     func fetchCollage(collage: Collage, user: CollageUser) async throws -> CollageSession {
+        let targetId = UUID(uuidString: "4cd1e93f-1c82-406e-bb47-d8536f2ff671")
+        let isTargetCollage = collage.id == targetId
+        
+        if isTargetCollage {
+            print("DEBUG: fetchCollage - Processing 'Grad picsss' collage")
+        }
+        
         let collage: Collage = try await supabase
             .from("collages")
             .select()
@@ -877,7 +901,15 @@ class CollageDBManager {
             .execute()
             .value
         
+        if isTargetCollage {
+            print("DEBUG: fetchCollage - Successfully fetched collage data")
+        }
+        
         let members = try await fetchCollageMembers(collageId: collage.id)
+        if isTargetCollage {
+            print("DEBUG: fetchCollage - Found \(members.count) members")
+        }
+        
         let creator = members.filter { $0.id == collage.createdBy }.first ?? user
         
         // Only fetch photos for non-expired collages
@@ -890,17 +922,32 @@ class CollageDBManager {
                 try? await self.cleanupExpiredCollage(collageId: collage.id)
             }
             photos = []
+            if isTargetCollage {
+                print("DEBUG: fetchCollage - Collage is EXPIRED, no photos loaded")
+            }
         } else {
             photos = try await fetchPhotosForSession(sessionId: collage.id)
+            if isTargetCollage {
+                print("DEBUG: fetchCollage - Loaded \(photos.count) photos")
+            }
         }
         
-        return CollageSession(
+        let session = CollageSession(
             id: collage.id,
             collage: collage,
             creator: creator,
             members: members,
             photos: photos
         )
+        
+        if isTargetCollage {
+            print("DEBUG: fetchCollage - Successfully created CollageSession for 'Grad picsss'")
+            print("DEBUG: fetchCollage - Session ID: \(session.id)")
+            print("DEBUG: fetchCollage - Theme: \(session.collage.theme)")
+            print("DEBUG: fetchCollage - Is expired: \(isExpired)")
+        }
+        
+        return session
     }
     
     //MARK: - User Functions
@@ -1140,7 +1187,7 @@ class CollageDBManager {
     func fetchSentRequests() async throws -> [Friendship] {
         let user = try await getCurrentUser()
         
-        var query = supabase
+        let query = supabase
             .from("friendships")
             .select()
             .eq("user_id.", value: "\(user.id.uuidString)")
@@ -1509,7 +1556,7 @@ class CollageDBManager {
 
     /// Send collage invites to multiple friends at once
     func sendCollageInvitesToFriends(collageId: UUID, friendIds: [UUID]) async throws {
-        let user = try await getCurrentUser()
+        _ = try await getCurrentUser()
         
         // Verify collage exists and hasn't expired
         let collage: Collage = try await supabase

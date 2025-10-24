@@ -43,6 +43,8 @@ struct HomeScreenView: View {
             print("DEBUG: HomeScreenView appeared")
             print("DEBUG: Current user: \(appState.currentUser?.email ?? "nil")")
             print("DEBUG: Is authenticated: \(appState.isAuthenticated)")
+            print("DEBUG: Active sessions count: \(appState.activeSessions.count)")
+            print("DEBUG: Active sessions: \(appState.activeSessions.map { "\($0.collage.theme) (\($0.id))" })")
             if appState.currentUser == nil {
                 print("DEBUG: No current user, redirecting to onboardingWelcome")
                 appState.currentState = .onboardingWelcome
@@ -133,12 +135,15 @@ struct HomeScreenView: View {
                 GridItem(.flexible(), spacing: 16)
             ], spacing: 16) {
                 ForEach(Array(appState.activeSessions.enumerated()), id: \.element.id) { index, session in
-                    RealCollagePreviewCard(session: session, backgroundColor: thumbnailColors[index % thumbnailColors.count], photoCount: appState.collagePhotos.count)
+                    RealCollagePreviewCard(session: session, photoCount: appState.collagePhotos.count)
                         .onTapGesture {
                             Task {
                                 await appState.selectCollageSession(session)
                                 try? await Task.sleep(nanoseconds: 200_000_000)
                             }
+                        }
+                        .onAppear {
+                            print("DEBUG: Rendering card for session: \(session.collage.theme) (\(session.id))")
                         }
                 }
             }
@@ -188,7 +193,6 @@ struct HomeScreenView: View {
 struct RealCollagePreviewCard: View {
     @EnvironmentObject var appState: AppState
     let session: CollageSession
-    let backgroundColor: Color
     let photoCount: Int
     @State private var showExpirationAlert = false
     
@@ -201,6 +205,11 @@ struct RealCollagePreviewCard: View {
         VStack(spacing: 0) {
             // Top colored rectangle (collage preview)
             previewImageView
+            
+            // Divider line
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .frame(height: 1)
             
             // Bottom text section
             VStack(alignment: .leading, spacing: 4) {
@@ -225,6 +234,12 @@ struct RealCollagePreviewCard: View {
         .background(Color(hex: "FDFBF5"))
         .cornerRadius(16)
         .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .onAppear {
+            print("DEBUG: RealCollagePreviewCard appeared for: \(session.collage.theme)")
+            print("DEBUG: Session ID: \(session.id)")
+            print("DEBUG: Preview URL: \(session.preview_url ?? "nil")")
+            print("DEBUG: Photos count: \(session.photos.count)")
+        }
         .alert("Collage Expired", isPresented: $showExpirationAlert) {
             Button("View Final Collage", role: .none) {
                 appState.selectedSession = session
@@ -243,37 +258,6 @@ struct RealCollagePreviewCard: View {
 
     
     private var previewImageView: some View {
-        ZStack {
-            Rectangle()
-                .fill(backgroundColor)
-                .aspectRatio(1, contentMode: .fit)
-                .cornerRadius(12)
-            
-            if let previewUrl = preview_url, let url = URL(string: previewUrl) {
-                // Display preview image if available
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .clipped()
-                            .cornerRadius(12)
-                    case .failure(_), .empty:
-                        emptyPreviewView
-                    @unknown default:
-                        emptyPreviewView
-                    }
-                }
-            } else {
-                emptyPreviewView
-            }
-        }
-        .cornerRadius(12)
-    }
-    
-    private var emptyPreviewView: some View {
         // Use different colors for each collage frame matching the UI design
         let colors: [Color] = [
             Color(hex: "DCACAC"), // Top left - Light pink/beige
@@ -283,12 +267,43 @@ struct RealCollagePreviewCard: View {
         ]
         
         let colorIndex = (session.id.hashValue % 4 + 4) % 4
-        let selectedColor = colors[colorIndex]
+        let borderColor = colors[colorIndex]
         
-        return Rectangle()
-            .fill(selectedColor)
-            .aspectRatio(1, contentMode: .fit)
-            .cornerRadius(12)
+        return ZStack {
+            // Colored background (always present for unstarted collages)
+            Rectangle()
+                .fill(borderColor)
+            
+            // Preview image (if available)
+            if let previewUrl = preview_url, let url = URL(string: previewUrl), !previewUrl.isEmpty {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                    case .failure(_), .empty:
+                        // Show colored background for unstarted collage
+                        EmptyView()
+                    @unknown default:
+                        // Show colored background for unstarted collage
+                        EmptyView()
+                    }
+                }
+            } else {
+                // Empty state - show colored background for unstarted collage
+                EmptyView()
+            }
+        }
+        .frame(height: 200) // Keep the increased vertical height
+        .overlay(
+            // Colored border around the entire preview area
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(borderColor, lineWidth: 7) // 7pt border around preview (increased by 2px)
+        )
+        .cornerRadius(12)
     }
     
     private var timeRemainingText: String {
@@ -484,3 +499,4 @@ struct InviteCodeSheet: View {
     HomeScreenView()
         .environmentObject(AppState.shared)
 }
+

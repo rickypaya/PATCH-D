@@ -793,7 +793,7 @@ struct OnboardingSignUpView: View {
                                 .textFieldStyle(CustomTextFieldStyle())
                                 .keyboardType(.emailAddress)
                                 .autocapitalization(.none)
-                                .onChange(of: email) { _ in
+                                .onChange(of: email) {
                                     showEmailError = !email.isEmpty && !isEmailValid
                                     showGeneralError = false
                                 }
@@ -813,7 +813,7 @@ struct OnboardingSignUpView: View {
                             
                             SecureField("Enter at least 6 characters", text: $password)
                                 .textFieldStyle(CustomTextFieldStyle())
-                                .onChange(of: password) { _ in
+                                .onChange(of: password) {
                                     showPasswordError = !password.isEmpty && !isPasswordValid
                                     showGeneralError = false
                                 }
@@ -963,7 +963,7 @@ struct OnboardingSignInView: View {
                                 .textFieldStyle(CustomTextFieldStyle())
                                 .keyboardType(.emailAddress)
                                 .autocapitalization(.none)
-                                .onChange(of: email) { _ in
+                                .onChange(of: email) {
                                     showError = false
                                 }
                         }
@@ -976,7 +976,7 @@ struct OnboardingSignInView: View {
                             
                             SecureField("Enter your password", text: $password)
                                 .textFieldStyle(CustomTextFieldStyle())
-                                .onChange(of: password) { _ in
+                                .onChange(of: password) {
                                     showError = false
                                 }
                         }

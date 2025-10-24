@@ -386,7 +386,7 @@ struct CollageFullscreenView: View {
         let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
         if let image = pasteboard.image {
             addPhotoToCanvas(image: image, in: viewSize)
-        } else if let data = pasteboard.data(forPasteboardType: "public.png") {
+        } else if pasteboard.data(forPasteboardType: "public.png") != nil {
 //            addPhotoToCanvas(image: image, in: viewSize)
             await appState.addPhotoFromPasteboard(at: centerPoint)
         } else {
@@ -463,7 +463,7 @@ struct CollageFullscreenView: View {
     }
     
     private func addStickerToCanvas(stickerURL: String, in viewSize: CGSize) {
-        let centerPoint = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
+        _ = CGPoint(x: viewSize.width / 2, y: viewSize.height / 2)
         
         Task {
             // Check if the stickerURL is an emoji (fallback stickers)

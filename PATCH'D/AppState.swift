@@ -113,6 +113,12 @@ class AppState: ObservableObject {
         }
         do {
             collageMemberships = try await dbManager.fetchMemberships(userId: currentUser.id)
+            print("DEBUG: User memberships: \(collageMemberships.map { $0.uuidString })")
+            let targetId = UUID(uuidString: "4cd1e93f-1c82-406e-bb47-d8536f2ff671")
+            if let targetId = targetId {
+                let isMember = collageMemberships.contains(targetId)
+                print("DEBUG: Is user member of 'Grad picsss' collage (\(targetId.uuidString)): \(isMember)")
+            }
             currentState = .homeScreen
         } catch {
             errorMessage = "Failed to load user memberships: \(error.localizedDescription)"
@@ -139,11 +145,32 @@ class AppState: ObservableObject {
                 user: currentUser
             )
             
+            print("DEBUG: Raw active sessions count: \(active.count)")
+            print("DEBUG: Raw expired sessions count: \(expired.count)")
+            
+            // Check specifically for the Grad picsss collage
+            let targetId = UUID(uuidString: "4cd1e93f-1c82-406e-bb47-d8536f2ff671")
+            if let targetId = targetId {
+                let inActive = active.contains { $0.id == targetId }
+                let inExpired = expired.contains { $0.id == targetId }
+                print("DEBUG: 'Grad picsss' collage in active sessions: \(inActive)")
+                print("DEBUG: 'Grad picsss' collage in expired sessions: \(inExpired)")
+                
+                if let foundSession = active.first(where: { $0.id == targetId }) {
+                    print("DEBUG: Found 'Grad picsss' session - Theme: \(foundSession.collage.theme)")
+                    print("DEBUG: Expires at: \(foundSession.collage.expiresAt)")
+                    print("DEBUG: Is expired: \(foundSession.collage.expiresAt < Date())")
+                }
+            }
+            
             // Sort active sessions by creation date (most recent first)
             activeSessions = active.sorted { $0.collage.createdAt > $1.collage.createdAt }
             
             // Sort expired sessions by creation date (most recent first)
             archive = expired.sorted { $0.collage.createdAt > $1.collage.createdAt }
+            
+            print("DEBUG: Final active sessions count: \(activeSessions.count)")
+            print("DEBUG: Final active sessions themes: \(activeSessions.map { $0.collage.theme })")
             
             // Cache the sessions
             activeSessions.forEach { sessionCache[$0.id] = $0 }
@@ -284,7 +311,7 @@ class AppState: ObservableObject {
         
         do {
             // Step 1: Create Supabase auth user and user record
-            let authResp = try await dbManager.signUpWithEmail(email: email, password: password)
+            _ = try await dbManager.signUpWithEmail(email: email, password: password)
             
             // Step 2: Wait a moment for the user record to be fully created
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -335,7 +362,7 @@ class AppState: ObservableObject {
         
         do {
             print("In signin func")
-            try await dbManager.signIn(email: email, password: password)
+            _ = try await dbManager.signIn(email: email, password: password)
             
             await loadCurrentUser()
             
@@ -529,7 +556,7 @@ class AppState: ObservableObject {
                            currentPhoto.scale != updatedPhoto.scale {
                             self.collagePhotos[index] = updatedPhoto
                             
-                            var position = CGPoint(x: updatedPhoto.position_x, y: updatedPhoto.position_y)
+                            let position = CGPoint(x: updatedPhoto.position_x, y: updatedPhoto.position_y)
                             
                             await self.updatePhotoTransform(currentPhoto,position: position, rotation: updatedPhoto.rotation, scale: updatedPhoto.scale)
                             
@@ -567,7 +594,7 @@ class AppState: ObservableObject {
     func captureAndUploadPreview(for session: CollageSession, from view: UIView) async {
         // Capture the view asynchronously to avoid blocking the main thread
         let image = await Task.detached(priority: .userInitiated) {
-            let renderer = UIGraphicsImageRenderer(bounds: view.bounds)
+            let renderer = await UIGraphicsImageRenderer(bounds: view.bounds)
             return renderer.image { context in
                 view.layer.render(in: context.cgContext)
             }
@@ -1112,11 +1139,11 @@ class AppState: ObservableObject {
         }
     }
     
-    func cacheImage(_ image: UIImage, for url: String) {
-        imageCacheQueue.async(flags: .barrier) {
-            self.imageCache[url] = image
+        func cacheImage(_ image: UIImage, for url: String) {
+            imageCacheQueue.async(flags: .barrier) { [weak self] in
+                self?.imageCache[url] = image
+            }
         }
-    }
     
     func loadImageAsync(from url: String) async -> UIImage? {
         // Check cache first
@@ -1140,11 +1167,11 @@ class AppState: ObservableObject {
         }
     }
     
-    func clearImageCache() {
-        imageCacheQueue.async(flags: .barrier) {
-            self.imageCache.removeAll()
+        func clearImageCache() {
+            imageCacheQueue.async(flags: .barrier) { [weak self] in
+                self?.imageCache.removeAll()
+            }
         }
-    }
     
     func invalidateSessionCache(for sessionId: UUID) {
         sessionCache.removeValue(forKey: sessionId)
