@@ -107,7 +107,7 @@ struct ProfileView: View {
                     }
                 }
             } label: {
-                Image("UIassets/Icon/icon-hamburger")
+                Image("icon-hamburger")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 40, height: 40)

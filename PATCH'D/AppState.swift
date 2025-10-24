@@ -135,12 +135,15 @@ class AppState: ObservableObject {
                 user: currentUser
             )
             
-            activeSessions = active
-            archive = expired
+            // Sort active sessions by creation date (most recent first)
+            activeSessions = active.sorted { $0.collage.createdAt > $1.collage.createdAt }
+            
+            // Sort expired sessions by creation date (most recent first)
+            archive = expired.sorted { $0.collage.createdAt > $1.collage.createdAt }
             
             // Cache the sessions
-            active.forEach { sessionCache[$0.id] = $0 }
-            expired.forEach { sessionCache[$0.id] = $0 }
+            activeSessions.forEach { sessionCache[$0.id] = $0 }
+            archive.forEach { sessionCache[$0.id] = $0 }
             
         } catch {
             errorMessage = "Failed to load collage sessions: \(error.localizedDescription)"
@@ -152,10 +155,13 @@ class AppState: ObservableObject {
         guard let currentUser = currentUser else { return }
         
         do {
-            activeSessions = try await dbManager.fetchActiveSessions(
+            let sessions = try await dbManager.fetchActiveSessions(
                 memberships: collageMemberships,
                 user: currentUser
             )
+            
+            // Sort active sessions by creation date (most recent first)
+            activeSessions = sessions.sorted { $0.collage.createdAt > $1.collage.createdAt }
             
             // Update cache
             activeSessions.forEach { sessionCache[$0.id] = $0 }
@@ -364,8 +370,9 @@ class AppState: ObservableObject {
                 isPartyMode: isPartyMode
             )
             
-            // Update local state
+            // Update local state and maintain sorting (most recent first)
             activeSessions.append(session)
+            activeSessions = activeSessions.sorted { $0.collage.createdAt > $1.collage.createdAt }
             collageMemberships.append(session.id)
             
             // Cache the new session
@@ -393,14 +400,21 @@ class AppState: ObservableObject {
     }
     
     func deselectCollageSession(captureView: UIView?) async {
-        if let session = selectedSession, let view = captureView {
-            await captureAndUploadPreview(for: session, from: view)
-        }
+        // Store session reference before clearing it
+        let sessionToCapture = selectedSession
+        
+        // Navigate immediately for better UX
         currentState = .homeScreen
         stopRealTimeSubscription()
         selectedSession = nil
         collagePhotos = []
         
+        // Capture preview in background if view is provided
+        if let session = sessionToCapture, let view = captureView {
+            Task.detached(priority: .background) {
+                await self.captureAndUploadPreview(for: session, from: view)
+            }
+        }
     }
     
     func captureExpiredSession(captureView: UIView?) async {
@@ -497,10 +511,13 @@ class AppState: ObservableObject {
     }
     
     func captureAndUploadPreview(for session: CollageSession, from view: UIView) async {
-        let renderer = UIGraphicsImageRenderer(bounds: view.bounds)
-        let image = renderer.image { context in
-            view.layer.render(in: context.cgContext)
-        }
+        // Capture the view asynchronously to avoid blocking the main thread
+        let image = await Task.detached(priority: .userInitiated) {
+            let renderer = UIGraphicsImageRenderer(bounds: view.bounds)
+            return renderer.image { context in
+                view.layer.render(in: context.cgContext)
+            }
+        }.value
         
         do {
             let imageUrl = try await dbManager.uploadCollagePreview(sessionId: session.id, image: image)
@@ -897,6 +914,8 @@ class AppState: ObservableObject {
             
             if !activeSessions.contains(where: { $0.id == session.id }) {
                 activeSessions.append(session)
+                // Maintain sorting (most recent first)
+                activeSessions = activeSessions.sorted { $0.collage.createdAt > $1.collage.createdAt }
             }
             
             // Cache the session
@@ -1021,6 +1040,8 @@ class AppState: ObservableObject {
             
             if !activeSessions.contains(where: { $0.id == session.id }) {
                 activeSessions.append(session)
+                // Maintain sorting (most recent first)
+                activeSessions = activeSessions.sorted { $0.collage.createdAt > $1.collage.createdAt }
             }
             
             // Cache the session
@@ -1236,6 +1257,9 @@ class AppState: ObservableObject {
                 print("Failed to accept invite \(inviteId): \(error)")
             }
         }
+        
+        // Sort active sessions after adding multiple invites (most recent first)
+        activeSessions = activeSessions.sorted { $0.collage.createdAt > $1.collage.createdAt }
         
         // Refresh collage invites
         await loadPendingCollageInvites(forceRefresh: true)

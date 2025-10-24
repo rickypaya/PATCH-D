@@ -80,7 +80,10 @@ struct CollageFullscreenView: View {
 
     private func onAppear() {
         initializePhotoStates()
-        Task { await appState.loadCollageMembersForSession(collage_id: session.id) }
+        Task { 
+            await appState.loadCollageMembersForSession(collage_id: session.id)
+            await appState.loadPhotosForSelectedSession()
+        }
     }
 
     // MARK: - Toolbar Actions
@@ -88,13 +91,9 @@ struct CollageFullscreenView: View {
     private func handleClose() {
         Task {
             clearToolbar = true
-            try? await Task.sleep(nanoseconds: 100_000_000)
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let window = windowScene.windows.first,
-               let rootView = window.rootViewController?.view {
-                await appState.deselectCollageSession(captureView: rootView)
-            }
-            // deselectCollageSession already navigates to homeScreen, no need for navigateBack()
+            
+            // Navigate immediately for better UX
+            await appState.deselectCollageSession(captureView: nil)
         }
     }
 
