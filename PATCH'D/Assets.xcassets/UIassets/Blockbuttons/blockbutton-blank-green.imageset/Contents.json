@@ -6,12 +6,18 @@
       "scale" : "1x"
     },
     {
+<<<<<<< HEAD
+=======
       "filename" : "blockbutton-blank-green.png",
+>>>>>>> db29439b5817dbb62d54a770cccf7192cb051bae
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
+<<<<<<< HEAD
+=======
       "filename" : "blockbutton-blank-green.png",
+>>>>>>> db29439b5817dbb62d54a770cccf7192cb051bae
       "idiom" : "universal",
       "scale" : "3x"
     }

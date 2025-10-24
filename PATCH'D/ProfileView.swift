@@ -28,6 +28,11 @@ struct ProfileView: View {
         appState.archive
     }
     
+    private var userEmail: String {
+        guard let user = appState.currentUser else { return "Unknown User" }
+        return user.email
+    }
+    
     // Total unique members across all user's contributed collages
     private var totalUniqueMembers: Int {
         let allMembers = userContributedCollages.flatMap { $0.members }
@@ -142,10 +147,22 @@ struct ProfileView: View {
     
     private var userStatsSection: some View {
         VStack(spacing: 16) {
+<<<<<<< HEAD
+            // Username
+            Text(username.isEmpty ? "Jericho" : username)
+                .font(.custom("Sanchez", size: 24))
+                .italic()
+                .foregroundColor(.black)
+            
+            Text(userEmail)
+                .font(.custom("Sanchez", size: 14))
+                .foregroundColor(.black)
+=======
             // Profile Name - Sanchez Regular 20, color 000000
             Text(username.isEmpty ? "Jchung" : username)
                 .font(.custom("Sanchez-Regular", size: 20))
                 .foregroundColor(Color(hex: "000000"))
+>>>>>>> db29439b5817dbb62d54a770cccf7192cb051bae
             
             // Statistics
             HStack(spacing: 40) {

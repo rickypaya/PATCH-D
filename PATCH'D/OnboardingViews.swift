@@ -913,7 +913,9 @@ struct OnboardingSignUpView: View {
                     generalErrorMessage = "Network error. Please check your internet connection and try again."
                 } else if errorMessage.contains("invalid") {
                     generalErrorMessage = "Invalid email or password format. Please check and try again."
-                } else {
+                } else if errorMessage.contains("username_format"){
+                    generalErrorMessage = "Username does not fit format, update in your profile view."
+                }else {
                     generalErrorMessage = "Unable to create account. Please try again later."
                 }
                 
