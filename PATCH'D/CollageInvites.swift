@@ -115,7 +115,7 @@ struct CollageInviteCard: View {
                     .fontWeight(.bold)
                     .foregroundColor(.black)
                 
-                HStack(spacing: 5) {
+                VStack(spacing: 5) {
                     Text("invited you to:")
                         .font(.custom("Sanchez", size: 14))
                         .foregroundColor(.black.opacity(0.6))

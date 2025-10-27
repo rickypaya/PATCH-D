@@ -104,7 +104,7 @@ struct CollageFullscreenView: View {
             showCopyAlert = false
         }
     }
-
+    
     
     var body: some View {
         GeometryReader { geometry in
@@ -324,6 +324,7 @@ struct CollageFullscreenView: View {
            let rootView = window.rootViewController?.view {
             Task {
                 await appState.captureExpiredSession(captureView: rootView)
+                await appState.refreshArchivedSessions()
             }
         }
     }
@@ -555,116 +556,102 @@ struct CopyAlertView: View {
         .cornerRadius(10)
     }
 }
+    
+    
+    // MARK: - Top Toolbar View
+    struct TopToolbarView: View {
+        let onClose: () -> Void
+        let onCopyCode: () -> Void
+        let onAddSticker: () -> Void
+        let onPaste: () -> Void
+        let onAddPhoto: () -> Void
+        @Binding var showMenuDropdown: Bool
+        let clearToolbar: Bool
+        let session: CollageSession
+        let expirationDate: Date
+        @Binding var isExpired: Bool
+        @EnvironmentObject var appState: AppState
+        
+        var body: some View {
+            ZStack {
+                HStack {
+                    // Close Button
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                    }
+                    
+                    Spacer()
+                    
+                    VStack {
+                        Text(session.theme)
+                            .font(.system(size: 24))
+                            .foregroundColor(.gray.opacity(0.8))
+                        
+                        TimelineView(.periodic(from: Date(), by: 1.0)) { context in
+                            let timeRemaining = session.expiresAt.timeIntervalSince(context.date)
+                            
+                            if timeRemaining <= 0 {
+                                Text("Expired")
+                                    .font(.custom("Sanchez", size: 12))
+                                    .foregroundColor(.red.opacity(0.8))
+                                    .onAppear {
+                                        if !isExpired {
+                                            isExpired = true
+                                        }
+                                    }
+                            } else {
+                                let days = Int(timeRemaining) / 86400
+                                let hours = Int(timeRemaining) / 3600 % 24
+                                let minutes = Int(timeRemaining) / 60 % 60
+                                let seconds = Int(timeRemaining) % 60
+                                
+                                Text(String(format: "%02d:%02d:%02d:%02d", days, hours, minutes, seconds))
+                                    .font(.custom("Sanchez", size: 12))
+                                    .foregroundColor(.black.opacity(0.7))
+                                    .monospacedDigit()
+                            }
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    // Menu Button
+                    Menu {
+                        Button(action: onAddSticker) {
+                            Label("Add Sticker", systemImage: "face.smiling")
+                        }
+                        
+                        Button(action: onCopyCode) {
+                            Label("Copy Invite Code", systemImage: "document.on.document")
+                        }
+                        
+                        Button(action: onPaste) {
+                            Label("Paste", systemImage: "doc.on.clipboard")
+                        }
+                        
+                        Button(action: onAddPhoto) {
+                            Label("Add Photo", systemImage: "plus")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                            .background(Color.blue.opacity(0.8))
+                            .clipShape(Circle())
+                    }
+                }
+                .padding()
+                .frame(height: 120)
+            }
+            .padding(.top, 16)
+        }
+    }
 
-// MARK: - Preview
-#Preview("Collage FullScreen View") {
-    CollageFullscreenView(session: CollageSession(
-        id: UUID(),
-        collage: Collage(
-            id: UUID(),
-            theme: "Sunset Vibes 🌅",
-            createdBy: UUID(),
-            inviteCode: "ABC123",
-            startsAt: Date(),
-            expiresAt: Date().addingTimeInterval(3600), // 1 hour from now
-            createdAt: Date(),
-            updatedAt: Date(),
-            backgroundUrl: nil,
-            previewUrl: nil,
-            isPartyMode: false
-        ),
-        creator: CollageUser(
-            id: UUID(),
-            email: "creator@example.com",
-            username: "Creator",
-            avatarUrl: nil,
-            createdAt: Date(),
-            updatedAt: nil
-        ),
-        members: [
-            CollageUser(
-                id: UUID(),
-                email: "user1@example.com",
-                username: "User1",
-                avatarUrl: nil,
-                createdAt: Date(),
-                updatedAt: nil
-            ),
-            CollageUser(
-                id: UUID(),
-                email: "user2@example.com",
-                username: "User2",
-                avatarUrl: nil,
-                createdAt: Date(),
-                updatedAt: nil
-            ),
-            CollageUser(
-                id: UUID(),
-                email: "user3@example.com",
-                username: "User3",
-                avatarUrl: nil,
-                createdAt: Date(),
-                updatedAt: nil
-            ),
-            CollageUser(
-                id: UUID(),
-                email: "user4@example.com",
-                username: "User4",
-                avatarUrl: nil,
-                createdAt: Date(),
-                updatedAt: nil
-            )
-        ],
-        photos: []
-    ))
-    .environmentObject(AppState.preview())
-}
-
-#Preview("Collage FullScreen View - Party Mode") {
-    CollageFullscreenView(session: CollageSession(
-        id: UUID(),
-        collage: Collage(
-            id: UUID(),
-            theme: "MYSTERY",
-            createdBy: UUID(),
-            inviteCode: "PARTY456",
-            startsAt: Date(),
-            expiresAt: Date().addingTimeInterval(1800), // 30 minutes from now
-            createdAt: Date(),
-            updatedAt: Date(),
-            backgroundUrl: nil,
-            previewUrl: nil,
-            isPartyMode: true
-        ),
-        creator: CollageUser(
-            id: UUID(),
-            email: "partycreator@example.com",
-            username: "PartyCreator",
-            avatarUrl: nil,
-            createdAt: Date(),
-            updatedAt: nil
-        ),
-        members: [
-            CollageUser(
-                id: UUID(),
-                email: "partyuser1@example.com",
-                username: "PartyUser1",
-                avatarUrl: nil,
-                createdAt: Date(),
-                updatedAt: nil
-            ),
-            CollageUser(
-                id: UUID(),
-                email: "partyuser2@example.com",
-                username: "PartyUser2",
-                avatarUrl: nil,
-                createdAt: Date(),
-                updatedAt: nil
-            )
-        ],
-        photos: []
-    ))
-    .environmentObject(AppState.preview())
-}
 
 

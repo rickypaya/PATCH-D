@@ -300,6 +300,9 @@ struct ProfileView: View {
         }
         .onAppear {
             username = appState.currentUser?.username ?? "Jchung"
+            Task {
+                await appState.loadPendingCollageInvites(forceRefresh: true)
+            }
         }
         .confirmationDialog("Add Photo", isPresented: $showImagePicker) {
             Button("Take Photo") {

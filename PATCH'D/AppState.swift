@@ -150,6 +150,19 @@ class AppState: ObservableObject {
         }
     }
     
+    func refreshArchivedSessions() async {
+        guard let currentUser = currentUser else { return }
+        
+        do {
+            archive = try await dbManager.fetchExpiredSession(
+                memberships: collageMemberships,
+                user: currentUser
+            )
+        } catch {
+            errorMessage = "Failed to refresh sessions: \(error.localizedDescription)"
+        }
+    }
+    
     // Refresh only active sessions (lighter operation)
     func refreshActiveSessions() async {
         guard let currentUser = currentUser else { return }
@@ -424,7 +437,7 @@ class AppState: ObservableObject {
         
         try? await Task.sleep(nanoseconds: 100_000_000)
         
-        currentState = .final
+        currentState = .profile
         stopRealTimeSubscription()
         collagePhotos = []
     }

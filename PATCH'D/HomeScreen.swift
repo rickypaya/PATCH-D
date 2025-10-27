@@ -50,6 +50,9 @@ struct HomeScreenView: View {
                 print("DEBUG: User authenticated, staying on home screen")
             }
         }
+        .refreshable {
+            await appState.refreshActiveSessions()
+        }
     }
     
     // MARK: - Top Navigation Bar
@@ -206,13 +209,31 @@ struct RealCollagePreviewCard: View {
                     .fontWeight(.regular)
                     .foregroundColor(Color(hex: "000000"))
                     .lineLimit(1)
-                
-                // Time remaining
-                Text(timeRemainingText)
-                    .font(.custom("Sanchez", size: 12))
-                    .fontWeight(.regular)
-                    .foregroundColor(Color(hex: "595245"))
-                    .lineLimit(1)
+
+                HStack {
+                    // Members Count
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption)
+                            .foregroundColor(.black.opacity(0.7))
+                        Text("\(session.members.count)")
+                            .font(.custom("Sanchez", size: 14))
+                            .foregroundColor(.black.opacity(0.7))
+                        
+                        Spacer()
+                        
+                        Text("\(session.photos.count) photos")
+                            .font(.custom("Sanchez", size: 12))
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(6)
+                            .background(Color.black.opacity(0.7))
+                            .cornerRadius(6)
+                            .padding(6)
+                    }
+                    
+                }
+        
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)

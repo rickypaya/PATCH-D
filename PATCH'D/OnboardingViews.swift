@@ -120,30 +120,30 @@ struct Onboarding1Content: View {
             
             Spacer()
             
-            // Next Button
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    appState.currentState = .onboarding2
-                }
-            }) {
-                Text("Next")
-                    .font(.custom("Sanchez", size: 18))
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(Color(red: 0.220, green: 0.376, blue: 0.243))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
-                            .foregroundColor(Color(red: 0.078, green: 0.259, blue: 0.102))
-                            .padding(2)
-                    )
-                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-            }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 20)
+//            // Next Button
+//            Button(action: {
+//                withAnimation(.easeInOut(duration: 0.5)) {
+//                    appState.currentState = .onboarding2
+//                }
+//            }) {
+//                Text("Next")
+//                    .font(.custom("Sanchez", size: 18))
+//                    .fontWeight(.bold)
+//                    .foregroundColor(.white)
+//                    .frame(maxWidth: .infinity)
+//                    .frame(height: 56)
+//                    .background(Color(red: 0.220, green: 0.376, blue: 0.243))
+//                    .cornerRadius(12)
+//                    .overlay(
+//                        RoundedRectangle(cornerRadius: 10)
+//                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
+//                            .foregroundColor(Color(red: 0.078, green: 0.259, blue: 0.102))
+//                            .padding(2)
+//                    )
+//                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+//            }
+//            .padding(.horizontal, 40)
+//            .padding(.bottom, 20)
         }
         .onChange(of: isActive) { oldValue, newValue in
             if newValue { triggerAnimations() } else { resetAnimations() }
@@ -232,30 +232,30 @@ struct Onboarding2Content: View {
             
             Spacer()
             
-            // Next Button
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    appState.currentState = .onboarding3
-                }
-            }) {
-                Text("Next")
-                    .font(.custom("Sanchez", size: 18))
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(Color(red: 0.220, green: 0.376, blue: 0.243))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
-                            .foregroundColor(Color(red: 0.078, green: 0.259, blue: 0.102))
-                            .padding(2)
-                    )
-                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-            }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 20)
+//            // Next Button
+//            Button(action: {
+//                withAnimation(.easeInOut(duration: 0.5)) {
+//                    appState.currentState = .onboarding3
+//                }
+//            }) {
+//                Text("Next")
+//                    .font(.custom("Sanchez", size: 18))
+//                    .fontWeight(.bold)
+//                    .foregroundColor(.white)
+//                    .frame(maxWidth: .infinity)
+//                    .frame(height: 56)
+//                    .background(Color(red: 0.220, green: 0.376, blue: 0.243))
+//                    .cornerRadius(12)
+//                    .overlay(
+//                        RoundedRectangle(cornerRadius: 10)
+//                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
+//                            .foregroundColor(Color(red: 0.078, green: 0.259, blue: 0.102))
+//                            .padding(2)
+//                    )
+//                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+//            }
+//            .padding(.horizontal, 40)
+//            .padding(.bottom, 20)
         }
         .onChange(of: isActive) { oldValue, newValue in
             if newValue { triggerAnimations() } else { resetAnimations() }
@@ -342,30 +342,30 @@ struct Onboarding3Content: View {
             
             Spacer()
             
-            // Next Button
-            Button(action: {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    appState.currentState = .onboarding4
-                }
-            }) {
-                Text("Next")
-                    .font(.custom("Sanchez", size: 18))
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(Color(red: 0.220, green: 0.376, blue: 0.243))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
-                            .foregroundColor(Color(red: 0.078, green: 0.259, blue: 0.102))
-                            .padding(2)
-                    )
-                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
-            }
-            .padding(.horizontal, 40)
-            .padding(.bottom, 20)
+//            // Next Button
+//            Button(action: {
+//                withAnimation(.easeInOut(duration: 0.5)) {
+//                    appState.currentState = .onboarding4
+//                }
+//            }) {
+//                Text("Next")
+//                    .font(.custom("Sanchez", size: 18))
+//                    .fontWeight(.bold)
+//                    .foregroundColor(.white)
+//                    .frame(maxWidth: .infinity)
+//                    .frame(height: 56)
+//                    .background(Color(red: 0.220, green: 0.376, blue: 0.243))
+//                    .cornerRadius(12)
+//                    .overlay(
+//                        RoundedRectangle(cornerRadius: 10)
+//                            .stroke(style: StrokeStyle(lineWidth: 2, dash: [4, 4]))
+//                            .foregroundColor(Color(red: 0.078, green: 0.259, blue: 0.102))
+//                            .padding(2)
+//                    )
+//                    .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+//            }
+//            .padding(.horizontal, 40)
+//            .padding(.bottom, 20)
         }
         .onChange(of: isActive) { oldValue, newValue in
             if newValue { triggerAnimations() } else { resetAnimations() }
