@@ -146,18 +146,18 @@ struct ProfileView: View {
     }
     
     private var userStatsSection: some View {
-        VStack(spacing: 16) {
 
-            // Profile Name - Sanchez Regular 20, color 000000
+
             Text(username.isEmpty ? "Jchung" : username)
                 .font(.custom("Sanchez-Regular", size: 20))
                 .foregroundColor(Color(hex: "000000"))
-
+                
 
             Text(userEmail)
-                .font(.custom("Sanchez", size: 14))
+                .font(.custom("Sanchez-Regular", size: 14))
                 .foregroundColor(.black)
-
+            // Profile Name - Sanchez Regular 20, color 000000
+            
             // Statistics
             HStack(spacing: 40) {
                 // Collages count
@@ -334,7 +334,11 @@ struct ProfileCollagePreviewCard: View {
     @EnvironmentObject var appState: AppState
     let session: CollageSession
     let backgroundColor: Color
-    @State var preview_url: String?
+    
+    // Computed property that reacts to session changes
+    private var preview_url: String? {
+        session.preview_url
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -391,9 +395,6 @@ struct ProfileCollagePreviewCard: View {
                 .foregroundColor(.black)
                 .lineLimit(1)
                 .padding(.top, 4)
-        }
-        .onAppear {
-            preview_url = session.preview_url ?? ""
         }
         .onTapGesture {
             appState.selectedSession = session

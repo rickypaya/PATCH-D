@@ -42,6 +42,10 @@ class AppState: ObservableObject {
     private var friendRequestsCache: [(Friendship, CollageUser)] = []
     private var collageInvitesCache: [(CollageInvite, Collage, CollageUser)] = []
     
+    // MARK: - Image Cache for Performance
+    private var imageCache: [String: UIImage] = [:] // URL -> UIImage
+    private let imageCacheQueue = DispatchQueue(label: "imageCache", attributes: .concurrent)
+    
     private var realTimeTask: Task<Void, Never>?
     
     //MARK: - Private properties
@@ -109,6 +113,12 @@ class AppState: ObservableObject {
         }
         do {
             collageMemberships = try await dbManager.fetchMemberships(userId: currentUser.id)
+            print("DEBUG: User memberships: \(collageMemberships.map { $0.uuidString })")
+            let targetId = UUID(uuidString: "4cd1e93f-1c82-406e-bb47-d8536f2ff671")
+            if let targetId = targetId {
+                let isMember = collageMemberships.contains(targetId)
+                print("DEBUG: Is user member of 'Grad picsss' collage (\(targetId.uuidString)): \(isMember)")
+            }
             currentState = .homeScreen
         } catch {
             errorMessage = "Failed to load user memberships: \(error.localizedDescription)"
@@ -135,11 +145,32 @@ class AppState: ObservableObject {
                 user: currentUser
             )
             
+            print("DEBUG: Raw active sessions count: \(active.count)")
+            print("DEBUG: Raw expired sessions count: \(expired.count)")
+            
+            // Check specifically for the Grad picsss collage
+            let targetId = UUID(uuidString: "4cd1e93f-1c82-406e-bb47-d8536f2ff671")
+            if let targetId = targetId {
+                let inActive = active.contains { $0.id == targetId }
+                let inExpired = expired.contains { $0.id == targetId }
+                print("DEBUG: 'Grad picsss' collage in active sessions: \(inActive)")
+                print("DEBUG: 'Grad picsss' collage in expired sessions: \(inExpired)")
+                
+                if let foundSession = active.first(where: { $0.id == targetId }) {
+                    print("DEBUG: Found 'Grad picsss' session - Theme: \(foundSession.collage.theme)")
+                    print("DEBUG: Expires at: \(foundSession.collage.expiresAt)")
+                    print("DEBUG: Is expired: \(foundSession.collage.expiresAt < Date())")
+                }
+            }
+            
             // Sort active sessions by creation date (most recent first)
             activeSessions = active.sorted { $0.collage.createdAt > $1.collage.createdAt }
             
             // Sort expired sessions by creation date (most recent first)
             archive = expired.sorted { $0.collage.createdAt > $1.collage.createdAt }
+            
+            print("DEBUG: Final active sessions count: \(activeSessions.count)")
+            print("DEBUG: Final active sessions themes: \(activeSessions.map { $0.collage.theme })")
             
             // Cache the sessions
             activeSessions.forEach { sessionCache[$0.id] = $0 }
@@ -266,31 +297,69 @@ class AppState: ObservableObject {
         currentState = .profile
     }
     
+    //MARK: - Debug Methods
+    
+    func testSignUpProcess() async {
+        print("🔍 Testing sign up process...")
+        
+        do {
+            // Test database connection
+            try await dbManager.testDatabaseConnection()
+            
+            // Test users table
+            try await dbManager.testUsersTable()
+            
+            print("✅ All database tests passed!")
+        } catch {
+            print("❌ Database test failed: \(error)")
+            errorMessage = "Database connection issue: \(error.localizedDescription)"
+        }
+    }
+    
     //MARK: - Authentication
     
     func signUpWithEmail(email: String, password: String, username: String) async throws {
         isLoading = true
         errorMessage = nil
+        
         do {
-            let authResp = try await dbManager.signUpWithEmail(email: email, password: password)
+            // Step 1: Create Supabase auth user and user record
+            _ = try await dbManager.signUpWithEmail(email: email, password: password)
             
-            // Try to update username, but don't fail if user record doesn't exist yet
-            do {
-                try await dbManager.updateUsername(username: username)
-            } catch {
-                print("Warning: Failed to update username: \(error)")
-                // Continue with authentication even if username update fails
+            // Step 2: Wait a moment for the user record to be fully created
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            
+            // Step 3: Update username with retry logic
+            var usernameUpdateSuccess = false
+            for attempt in 1...3 {
+                do {
+                    try await dbManager.updateUsername(username: username)
+                    usernameUpdateSuccess = true
+                    break
+                } catch {
+                    print("Username update attempt \(attempt) failed: \(error)")
+                    if attempt < 3 {
+                        // Wait before retry
+                        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    }
+                }
             }
             
-            // Load the current user to set authentication state
+            if !usernameUpdateSuccess {
+                print("Warning: Failed to update username after 3 attempts, but continuing with sign up")
+            }
+            
+            // Step 4: Load the current user to set authentication state
             await loadCurrentUser()
             
-            // Check if user was successfully loaded
+            // Step 5: Verify user was successfully loaded
             guard isAuthenticated && currentUser != nil else {
-                throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "Failed to load user after sign up"])
+                throw NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "Failed to load user after sign up. Please try logging in manually."])
             }
             
+            // Step 6: Navigate to success screen
             currentState = .registrationSuccess
+            
         } catch {
             errorMessage = error.localizedDescription
             isLoading = false
@@ -306,7 +375,7 @@ class AppState: ObservableObject {
         
         do {
             print("In signin func")
-            try await dbManager.signIn(email: email, password: password)
+            _ = try await dbManager.signIn(email: email, password: password)
             
             await loadCurrentUser()
             
@@ -372,7 +441,7 @@ class AppState: ObservableObject {
         errorMessage = nil
     }
     
-    func createNewCollageSession(theme: String, duration: TimeInterval, isPartyMode: Bool) async {
+    func createNewCollageSession(theme: String, duration: TimeInterval, isPartyMode: Bool) async -> CollageSession? {
         isLoading = true
         errorMessage = nil
         
@@ -391,11 +460,14 @@ class AppState: ObservableObject {
             // Cache the new session
             sessionCache[session.id] = session
             
+            isLoading = false
+            return session
+            
         } catch {
             errorMessage = "Error creating collage: \(error.localizedDescription)"
+            isLoading = false
+            return nil
         }
-        
-        isLoading = false
     }
     
     func selectCollageSession(_ session: CollageSession) async {
@@ -480,6 +552,11 @@ class AppState: ObservableObject {
                     print("Real-time: Photo inserted - \(newPhoto.id)")
                 }
                 
+                // Trigger preview update when photos are added
+                if !insertedPhotos.isEmpty {
+                    self.schedulePreviewUpdate()
+                }
+                
                 // Handle UPDATES - photos that exist in both lists but may have changed
                 for updatedPhoto in updatedPhotos {
                     if let index = self.collagePhotos.firstIndex(where: { $0.id == updatedPhoto.id }) {
@@ -492,7 +569,7 @@ class AppState: ObservableObject {
                            currentPhoto.scale != updatedPhoto.scale {
                             self.collagePhotos[index] = updatedPhoto
                             
-                            var position = CGPoint(x: updatedPhoto.position_x, y: updatedPhoto.position_y)
+                            let position = CGPoint(x: updatedPhoto.position_x, y: updatedPhoto.position_y)
                             
                             await self.updatePhotoTransform(currentPhoto,position: position, rotation: updatedPhoto.rotation, scale: updatedPhoto.scale)
                             
@@ -521,12 +598,16 @@ class AppState: ObservableObject {
     private func stopRealTimeSubscription() {
         realTimeTask?.cancel()
         realTimeTask = nil
+        
+        // Also cancel any pending preview updates
+        previewUpdateTask?.cancel()
+        previewUpdateTask = nil
     }
     
     func captureAndUploadPreview(for session: CollageSession, from view: UIView) async {
         // Capture the view asynchronously to avoid blocking the main thread
         let image = await Task.detached(priority: .userInitiated) {
-            let renderer = UIGraphicsImageRenderer(bounds: view.bounds)
+            let renderer = await UIGraphicsImageRenderer(bounds: view.bounds)
             return renderer.image { context in
                 view.layer.render(in: context.cgContext)
             }
@@ -540,13 +621,47 @@ class AppState: ObservableObject {
                 cachedSession.collage.previewUrl = imageUrl
                 sessionCache[session.id] = cachedSession
                 
-                // Update in arrays
+                // Update in activeSessions array
                 if let index = activeSessions.firstIndex(where: { $0.id == session.id }) {
                     activeSessions[index].collage.previewUrl = imageUrl
+                }
+                
+                // Update in archive array
+                if let index = archive.firstIndex(where: { $0.id == session.id }) {
+                    archive[index].collage.previewUrl = imageUrl
                 }
             }
         } catch {
             errorMessage = "Failed to upload preview: \(error.localizedDescription)"
+        }
+    }
+    
+    // MARK: - Preview Update Scheduling
+    
+    private var previewUpdateTask: Task<Void, Never>?
+    
+    private func schedulePreviewUpdate() {
+        // Cancel any existing preview update task
+        previewUpdateTask?.cancel()
+        
+        // Schedule a new preview update with a 2-second delay
+        previewUpdateTask = Task.detached(priority: .background) { [weak self] in
+            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            
+            await MainActor.run {
+                guard let self = self,
+                      let session = self.selectedSession,
+                      let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                      let window = windowScene.windows.first,
+                      let rootView = window.rootViewController?.view else {
+                    return
+                }
+                
+                // Capture and upload preview
+                Task {
+                    await self.captureAndUploadPreview(for: session, from: rootView)
+                }
+            }
         }
     }
     
@@ -568,15 +683,33 @@ class AppState: ObservableObject {
     }
     
     func uploadPhotoToStorage(_ image: UIImage) async throws -> String {
-        guard let session = selectedSession else { return ""}
-        do {
-            let url = try await dbManager.uploadCutoutImage(sessionId: session.id, image: image)
-            return url
-        }catch{
-            errorMessage = "Failed to upload photo: \(error.localizedDescription)"
-            print(errorMessage ?? "No error message")
+        guard let session = selectedSession else { 
+            throw NSError(domain: "AppState", code: 400, userInfo: [NSLocalizedDescriptionKey: "No active collage session"])
         }
-        return ""
+        
+        // Show loading state
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
+        
+        do {
+            // Upload with progress tracking
+            let url = try await dbManager.uploadCutoutImage(sessionId: session.id, image: image)
+            
+            await MainActor.run {
+                isLoading = false
+            }
+            
+            return url
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to upload photo: \(error.localizedDescription)"
+                isLoading = false
+            }
+            print("Upload error: \(error)")
+            throw error
+        }
     }
     
     func addPhotoToCollage(_ imageUrl: URL, at globalPosition: CGPoint) async {
@@ -1008,7 +1141,50 @@ class AppState: ObservableObject {
         friendsCache.removeAll()
         friendRequestsCache.removeAll()
         collageInvitesCache.removeAll()
+        clearImageCache()
     }
+    
+    // MARK: - Image Caching Methods
+    
+    func getCachedImage(for url: String) -> UIImage? {
+        return imageCacheQueue.sync {
+            return imageCache[url]
+        }
+    }
+    
+        func cacheImage(_ image: UIImage, for url: String) {
+            imageCacheQueue.async(flags: .barrier) { [weak self] in
+                self?.imageCache[url] = image
+            }
+        }
+    
+    func loadImageAsync(from url: String) async -> UIImage? {
+        // Check cache first
+        if let cachedImage = getCachedImage(for: url) {
+            return cachedImage
+        }
+        
+        // Load from network
+        guard let imageURL = URL(string: url) else { return nil }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: imageURL)
+            guard let image = UIImage(data: data) else { return nil }
+            
+            // Cache the image
+            cacheImage(image, for: url)
+            return image
+        } catch {
+            print("Failed to load image from \(url): \(error)")
+            return nil
+        }
+    }
+    
+        func clearImageCache() {
+            imageCacheQueue.async(flags: .barrier) { [weak self] in
+                self?.imageCache.removeAll()
+            }
+        }
     
     func invalidateSessionCache(for sessionId: UUID) {
         sessionCache.removeValue(forKey: sessionId)

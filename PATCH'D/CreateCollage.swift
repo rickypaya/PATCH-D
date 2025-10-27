@@ -148,7 +148,7 @@ struct ThemeDropdown: View {
                                 HStack {
                                     Text(themes[i])
                                         .font(.custom("Sanchez", size: 16))
-                                        .foregroundColor(.black)
+                                        .foregroundColor(Color(hex: "38603E"))
                                     Spacer()
                                     if selectionIndex == i {
                                         Image(systemName: "checkmark")
@@ -331,7 +331,7 @@ struct CreateCollageView: View {
                                                 }
                                                 TextField("", text: $themeInput)
                                                     .font(.custom("Sanchez", size: 16))
-                                                    .foregroundColor(Color(hex: "A8C2AE"))
+                                                    .foregroundColor(Color(hex: "38603E"))
                                                     .tracking(-0.5)
                                                     .onTapGesture { if selectedThemeIndex != nil { selectedThemeIndex = nil } }
                                             }
@@ -502,7 +502,7 @@ struct CreateCollageView: View {
                                             }
                                             TextField("", text: $themeInput)
                                                 .font(.custom("Sanchez", size: 16))
-                                                .foregroundColor(Color(hex: "A8C2AE"))
+                                                .foregroundColor(Color(hex: "38603E"))
                                                 .tracking(-0.5)
                                                 .disabled(isPartyMode)
                                                 .onTapGesture { if selectedThemeIndex != nil { selectedThemeIndex = nil } }
@@ -636,15 +636,12 @@ struct CreateCollageView: View {
             ? (predefinedThemes.randomElement() ?? "Party Time 🎉")
             : themeInput.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            await appState.createNewCollageSession(
+            if let newSession = await appState.createNewCollageSession(
                 theme: theme,
                 duration: selectedDuration,
                 isPartyMode: isPartyMode
-            )
-            await appState.loadCollageSessions()
-            
-            // Select the newly created session and navigate to fullscreen
-            if let newSession = appState.activeSessions.last {
+            ) {
+                // Select the newly created session and navigate to fullscreen
                 await appState.selectCollageSession(newSession)
                 withAnimation(.easeInOut(duration: 0.3)) {
                     appState.navigateTo(.fullscreen)
@@ -661,15 +658,12 @@ struct CreateCollageView: View {
 
         Task {
             let randomTheme = predefinedThemes.randomElement() ?? "Party Time 🎉"
-            await appState.createNewCollageSession(
+            if let newSession = await appState.createNewCollageSession(
                 theme: randomTheme,
                 duration: selectedDuration,
                 isPartyMode: true
-            )
-            await appState.loadCollageSessions()
-            
-            // Select the newly created session and navigate to fullscreen
-            if let newSession = appState.activeSessions.last {
+            ) {
+                // Select the newly created session and navigate to fullscreen
                 await appState.selectCollageSession(newSession)
                 withAnimation(.easeInOut(duration: 0.3)) {
                     appState.navigateTo(.fullscreen)
@@ -738,62 +732,62 @@ struct CreateCollage_PartyModeView: View {
                     VStack(spacing: 0) {
                         CheckeredBorder(a: partyBackground, b: .black, count: 15, height: 12)
 
-                         VStack(spacing: 24) {
-                             Image("party_icon")
-                                 .resizable()
-                                 .aspectRatio(contentMode: .fit)
-                                 .frame(width: 109, height: 82)
-                                 .foregroundColor(partyText)
+                        VStack(spacing: 24) {
+                            Image("party_icon")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 109, height: 82)
+                                .foregroundColor(partyText)
 
-                             Text("Create Collage")
-                                 .font(.custom("Sanchez", size: 28)).fontWeight(.bold)
-                                 .foregroundColor(Color(hex: "DF94A8"))
+                            Text("Create Collage")
+                                .font(.custom("Sanchez", size: 28)).fontWeight(.bold)
+                                .foregroundColor(Color(hex: "DF94A8"))
 
-                             // Locked Party Mode banner
-                             VStack(alignment: .center, spacing: 16) {
-                                 HStack(spacing: 12) {
-                                     Rectangle()
-                                         .fill(partyCheckbox)
-                                         .frame(width: 20, height: 20)
-                                         .overlay(
-                                             Image(systemName: "checkmark")
-                                                 .foregroundColor(partyCheckmark)
-                                                 .font(.system(size: 12, weight: .bold))
-                                         )
-                                     Text("Party Mode Collage")
-                                         .font(.custom("Sanchez", size: 16)).fontWeight(.bold)
-                                         .foregroundColor(partyBoxText)
-                                     Spacer()
-                                 }
-                                 .padding(.horizontal, 16)
-                                 .padding(.vertical, 11.5)
-                                 .background(partyBoxBg)
-                                 .cornerRadius(8)
-                                 .frame(maxWidth: 275)
+                            // Locked Party Mode banner
+                            VStack(alignment: .center, spacing: 16) {
+                                HStack(spacing: 12) {
+                                    Rectangle()
+                                        .fill(partyCheckbox)
+                                        .frame(width: 20, height: 20)
+                                        .overlay(
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(partyCheckmark)
+                                                .font(.system(size: 12, weight: .bold))
+                                        )
+                                    Text("Party Mode Collage")
+                                        .font(.custom("Sanchez", size: 16)).fontWeight(.bold)
+                                        .foregroundColor(partyBoxText)
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 11.5)
+                                .background(partyBoxBg)
+                                .cornerRadius(8)
+                                .frame(maxWidth: 275)
 
-                                 VStack(spacing: 4) {
-                                     Text("Random theme assigned")
-                                     Text("Photos blurred until final collage reveal")
-                                     Text("Shorter durations")
-                                 }
-                                 .font(.custom("Sanchez", size: 12))
-                                 .foregroundColor(partyText)
-                             }
+                                VStack(spacing: 4) {
+                                    Text("Random theme assigned")
+                                    Text("Photos blurred until final collage reveal")
+                                    Text("Shorter durations")
+                                }
+                                .font(.custom("Sanchez", size: 12))
+                                .foregroundColor(partyText)
+                            }
 
-                             // Theme display
-                             VStack(alignment: .leading, spacing: 8) {
-                                 Text("Theme/Title")
-                                     .font(.custom("Sanchez", size: 18)).fontWeight(.bold)
-                                     .foregroundColor(Color(hex: "E8CDB2"))
-                                 Text("MYSTERY")
-                                     .font(.custom("Sanchez", size: 16)).fontWeight(.bold)
-                                     .foregroundColor(Color(hex: "E5727E"))
-                                     .padding(.horizontal, 16)
-                                     .padding(.vertical, 11.5)
-                                     .background(Color.white)
-                                     .cornerRadius(8)
-                                     .frame(maxWidth: 270)
-                             }
+                            // Theme display
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Theme/Title")
+                                    .font(.custom("Sanchez", size: 18)).fontWeight(.bold)
+                                    .foregroundColor(Color(hex: "E8CDB2"))
+                                Text("MYSTERY")
+                                    .font(.custom("Sanchez", size: 16)).fontWeight(.bold)
+                                    .foregroundColor(Color(hex: "E5727E"))
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 11.5)
+                                    .background(Color.white)
+                                    .cornerRadius(8)
+                                    .frame(maxWidth: 270)
+                            }
 
                             Spacer().frame(height: -10)
 
@@ -832,7 +826,7 @@ struct CreateCollage_PartyModeView: View {
                                     )
                                     .cornerRadius(12)
                             }
-                             .disabled(isCreating)
+                            .disabled(isCreating)
                         }
                         .padding(.horizontal, 24)
                         .padding(.vertical, 32)
@@ -871,15 +865,12 @@ struct CreateCollage_PartyModeView: View {
 
         Task {
             let randomTheme = predefinedThemes.randomElement() ?? "Party Time 🎉"
-            await appState.createNewCollageSession(
+            if let newSession = await appState.createNewCollageSession(
                 theme: randomTheme,
                 duration: selectedDuration,
                 isPartyMode: true
-            )
-            await appState.loadCollageSessions()
-            
-            // Select the newly created session and navigate to fullscreen
-            if let newSession = appState.activeSessions.last {
+            ) {
+                // Select the newly created session and navigate to fullscreen
                 await appState.selectCollageSession(newSession)
                 withAnimation(.easeInOut(duration: 0.3)) {
                     appState.navigateTo(.fullscreen)

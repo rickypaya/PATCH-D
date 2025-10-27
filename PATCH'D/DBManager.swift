@@ -27,6 +27,7 @@ class CollageDBManager {
             supabaseURL: URL(string: "https://bxrnvixgpktkuwqncafe.supabase.co")!,
             supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4cm52aXhncGt0a3V3cW5jYWZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4ODU3NzEsImV4cCI6MjA3NTQ2MTc3MX0.hgluiRmwCUruyXvDrEwzDhtZ4zA2QdmClAt8GupIJgs"
         )
+        print("Supabase client initialized with URL: https://bxrnvixgpktkuwqncafe.supabase.co")
     }
     
     func getCurrentSession() async throws -> Session {
@@ -42,33 +43,53 @@ class CollageDBManager {
             return cachedUser
         }
         
-        let response: CollageUser = try await supabase
-            .from("users")
-            .select()
-            .eq("id", value: userId.uuidString)
-            .single()
-            .execute()
-            .value
-        
-        // Cache the user
-        userCache[userId] = response
-        return response
+        do {
+            let response: CollageUser = try await supabase
+                .from("users")
+                .select()
+                .eq("id", value: userId.uuidString)
+                .single()
+                .execute()
+                .value
+            
+            // Cache the user
+            userCache[userId] = response
+            return response
+        } catch {
+            print("Error fetching user from database: \(error)")
+            throw NSError(domain: "DB", code: 404, userInfo: [NSLocalizedDescriptionKey: "User record not found in database. Please try signing up again."])
+        }
     }
     
     func signUpWithEmail(email: String, password: String) async throws -> AuthResponse {
-        let authResp = try await supabase.auth.signUp(email: email, password: password)
-        
-        // Create user record in users table after successful auth signup
         do {
-            try await createUserRecord(userId: authResp.user.id, email: email)
+            let authResp = try await supabase.auth.signUp(email: email, password: password)
+            
+            // Create user record in users table after successful auth signup
+            do {
+                try await createUserRecord(userId: authResp.user.id, email: email)
+                print("Successfully created user record for user: \(authResp.user.id)")
+            } catch {
+                // If user record creation fails, we should still return the auth response
+                // The user can still be authenticated even if the custom user record creation fails
+                print("Warning: Failed to create user record in database: \(error)")
+                // Don't throw here - let the authentication proceed
+            }
+            
+            return authResp
         } catch {
-            // If user record creation fails, we should still return the auth response
-            // The user can still be authenticated even if the custom user record creation fails
-            print("Warning: Failed to create user record in database: \(error)")
-            // Don't throw here - let the authentication proceed
+            // Provide more specific error messages
+            let errorMessage = error.localizedDescription.lowercased()
+            if errorMessage.contains("already") || errorMessage.contains("exists") || errorMessage.contains("registered") {
+                throw NSError(domain: "Auth", code: 409, userInfo: [NSLocalizedDescriptionKey: "This email is already registered. Please log in instead."])
+            } else if errorMessage.contains("invalid") {
+                throw NSError(domain: "Auth", code: 400, userInfo: [NSLocalizedDescriptionKey: "Invalid email or password format. Please check and try again."])
+            } else if errorMessage.contains("network") || errorMessage.contains("connection") {
+                throw NSError(domain: "Auth", code: 503, userInfo: [NSLocalizedDescriptionKey: "Network error. Please check your internet connection and try again."])
+            } else {
+                throw NSError(domain: "Auth", code: 500, userInfo: [NSLocalizedDescriptionKey: "Unable to create account: \(error.localizedDescription)"])
+            }
         }
-        
-        return authResp
     }
     
     func createUserRecord(userId: UUID, email: String) async throws {
@@ -88,20 +109,27 @@ class CollageDBManager {
             updated_at: ISO8601DateFormatter().string(from: Date())
         )
         
-        try await supabase
-            .from("users")
-            .insert(userData)
-            .execute()
-        
-        // Cache the new user
-        let newUser = CollageUser(
-            id: userId,
-            email: email,
-            username: "",
-            createdAt: Date(),
-            updatedAt: Date()
-        )
-        userCache[userId] = newUser
+        do {
+            try await supabase
+                .from("users")
+                .insert(userData)
+                .execute()
+            
+            // Cache the new user
+            let newUser = CollageUser(
+                id: userId,
+                email: email,
+                username: "",
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+            userCache[userId] = newUser
+            
+            print("Successfully inserted user record into database: \(userId)")
+        } catch {
+            print("Error creating user record: \(error)")
+            throw NSError(domain: "DB", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to create user record in database: \(error.localizedDescription)"])
+        }
     }
     
     func signIn(email: String, password: String) async throws -> Session {
@@ -121,6 +149,42 @@ class CollageDBManager {
         friendshipsCache.removeAll()
         friendshipStatusCache.removeAll()
         collageInvitesCache.removeAll()
+    }
+    
+    // MARK: - Debug Methods
+    
+    func testDatabaseConnection() async throws {
+        do {
+            // Test basic connection by trying to fetch themes
+            let themes: [Theme] = try await supabase
+                .from("themes")
+                .select()
+                .limit(1)
+                .execute()
+                .value
+            
+            print("✅ Database connection successful. Found \(themes.count) themes.")
+        } catch {
+            print("❌ Database connection failed: \(error)")
+            throw error
+        }
+    }
+    
+    func testUsersTable() async throws {
+        do {
+            // Test users table structure
+            let users: [CollageUser] = try await supabase
+                .from("users")
+                .select()
+                .limit(1)
+                .execute()
+                .value
+            
+            print("✅ Users table accessible. Found \(users.count) users.")
+        } catch {
+            print("❌ Users table access failed: \(error)")
+            throw error
+        }
     }
     
     //MARK: - Theme Functions
@@ -452,16 +516,19 @@ class CollageDBManager {
     }
     
     func uploadImage(_ image: UIImage, bucket: String, folder: String, fileName: String) async throws -> String {
-        // Perform AVIF encoding on a background thread
-        let avifEncodedData = try await Task.detached(priority: .userInitiated) {
-            try AVIFEncoder.encode(image: image)
+        // Step 1: Optimize image size for collage (max 1920px width/height, 85% quality)
+        let optimizedImage = await optimizeImageForCollage(image)
+        
+        // Step 2: Perform AVIF encoding on a background thread with lower priority
+        let avifEncodedData = try await Task.detached(priority: .utility) {
+            try AVIFEncoder.encode(image: optimizedImage)
         }.value
         
         // Ensure the fileName has .avif extension
         let avifFileName = fileName.hasSuffix(".avif") ? fileName : "\(fileName.replacingOccurrences(of: ".png", with: "").replacingOccurrences(of: ".jpg", with: "").replacingOccurrences(of: ".jpeg", with: "")).avif"
         let filePath = "\(folder)/\(avifFileName)"
         
-        // Upload to Supabase storage
+        // Step 3: Upload to Supabase storage with progress tracking
         try await self.supabase.storage
             .from(bucket)
             .upload(
@@ -470,12 +537,59 @@ class CollageDBManager {
                 options: FileOptions(contentType: "image/avif", upsert: true)
             )
         
-        // Get and return the public URL
+        // Step 4: Get and return the public URL
         let publicURL = try self.supabase.storage
             .from(bucket)
             .getPublicURL(path: filePath)
         
         return publicURL.absoluteString
+    }
+    
+    // MARK: - Image Optimization
+    
+    private func optimizeImageForCollage(_ image: UIImage) async -> UIImage {
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let optimizedImage = self.resizeImageForCollage(image)
+                continuation.resume(returning: optimizedImage)
+            }
+        }
+    }
+    
+    private func resizeImageForCollage(_ image: UIImage) -> UIImage {
+        let maxDimension: CGFloat = 1920 // Max width or height
+        let compressionQuality: CGFloat = 0.85 // 85% quality
+        
+        // Calculate new size maintaining aspect ratio
+        let aspectRatio = image.size.width / image.size.height
+        var newSize: CGSize
+        
+        if image.size.width > image.size.height {
+            // Landscape
+            newSize = CGSize(width: maxDimension, height: maxDimension / aspectRatio)
+        } else {
+            // Portrait or square
+            newSize = CGSize(width: maxDimension * aspectRatio, height: maxDimension)
+        }
+        
+        // Don't upscale if image is already smaller
+        if image.size.width <= maxDimension && image.size.height <= maxDimension {
+            newSize = image.size
+        }
+        
+        // Create optimized image
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        let optimizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        // Compress the image
+        guard let imageData = optimizedImage?.jpegData(compressionQuality: compressionQuality),
+              let compressedImage = UIImage(data: imageData) else {
+            return image // Return original if compression fails
+        }
+        
+        return compressedImage
     }
     
     func uploadCollagePreview(sessionId: UUID, image: UIImage) async throws -> String {
@@ -667,6 +781,23 @@ class CollageDBManager {
             .execute()
             .value
         
+        print("DEBUG: fetchAllSessions - Found \(collages.count) collages")
+        print("DEBUG: fetchAllSessions - Collage IDs: \(collages.map { $0.id.uuidString })")
+        print("DEBUG: fetchAllSessions - Collage themes: \(collages.map { $0.theme })")
+        
+        // Check specifically for the Grad picsss collage
+        let targetId = UUID(uuidString: "4cd1e93f-1c82-406e-bb47-d8536f2ff671")
+        if let targetId = targetId {
+            let foundCollage = collages.first { $0.id == targetId }
+            if let collage = foundCollage {
+                print("DEBUG: Found 'Grad picsss' collage in database")
+                print("DEBUG: Theme: \(collage.theme)")
+                print("DEBUG: Expires at: \(collage.expiresAt)")
+                print("DEBUG: Is expired: \(collage.expiresAt < Date())")
+            } else {
+                print("DEBUG: 'Grad picsss' collage NOT found in database query")
+            }
+        }
         
         let now = Date()
         var activeSessions: [CollageSession] = []
@@ -755,6 +886,13 @@ class CollageDBManager {
     }
     
     func fetchCollage(collage: Collage, user: CollageUser) async throws -> CollageSession {
+        let targetId = UUID(uuidString: "4cd1e93f-1c82-406e-bb47-d8536f2ff671")
+        let isTargetCollage = collage.id == targetId
+        
+        if isTargetCollage {
+            print("DEBUG: fetchCollage - Processing 'Grad picsss' collage")
+        }
+        
         let collage: Collage = try await supabase
             .from("collages")
             .select()
@@ -763,7 +901,15 @@ class CollageDBManager {
             .execute()
             .value
         
+        if isTargetCollage {
+            print("DEBUG: fetchCollage - Successfully fetched collage data")
+        }
+        
         let members = try await fetchCollageMembers(collageId: collage.id)
+        if isTargetCollage {
+            print("DEBUG: fetchCollage - Found \(members.count) members")
+        }
+        
         let creator = members.filter { $0.id == collage.createdBy }.first ?? user
         
         // Only fetch photos for non-expired collages
@@ -776,17 +922,32 @@ class CollageDBManager {
                 try? await self.cleanupExpiredCollage(collageId: collage.id)
             }
             photos = []
+            if isTargetCollage {
+                print("DEBUG: fetchCollage - Collage is EXPIRED, no photos loaded")
+            }
         } else {
             photos = try await fetchPhotosForSession(sessionId: collage.id)
+            if isTargetCollage {
+                print("DEBUG: fetchCollage - Loaded \(photos.count) photos")
+            }
         }
         
-        return CollageSession(
+        let session = CollageSession(
             id: collage.id,
             collage: collage,
             creator: creator,
             members: members,
             photos: photos
         )
+        
+        if isTargetCollage {
+            print("DEBUG: fetchCollage - Successfully created CollageSession for 'Grad picsss'")
+            print("DEBUG: fetchCollage - Session ID: \(session.id)")
+            print("DEBUG: fetchCollage - Theme: \(session.collage.theme)")
+            print("DEBUG: fetchCollage - Is expired: \(isExpired)")
+        }
+        
+        return session
     }
     
     //MARK: - User Functions
@@ -1026,7 +1187,7 @@ class CollageDBManager {
     func fetchSentRequests() async throws -> [Friendship] {
         let user = try await getCurrentUser()
         
-        var query = supabase
+        let query = supabase
             .from("friendships")
             .select()
             .eq("user_id.", value: "\(user.id.uuidString)")
@@ -1395,7 +1556,7 @@ class CollageDBManager {
 
     /// Send collage invites to multiple friends at once
     func sendCollageInvitesToFriends(collageId: UUID, friendIds: [UUID]) async throws {
-        let user = try await getCurrentUser()
+        _ = try await getCurrentUser()
         
         // Verify collage exists and hasn't expired
         let collage: Collage = try await supabase

@@ -1,4 +1,5 @@
 # PATCH'D  - Overview
+## Presentation Link: https://www.canva.com/design/DAG2iNjdw2o/DQnJfMKoZr82CZL_fVXi8g/edit?utm_content=DAG2iNjdw2o&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton
 Patched is a mobile-first social application that reimagines digital collage-making as a playful, real-time, and collaborative creative experience. Designed for iPhone, Patched enables users to co-create visual compositions using photos, videos, and media cutouts with friends — transforming a traditionally solo creative act into a shared, dynamic, and interactive process.
 
 At its core, Patched combines computational visual design, social interaction, and real-time collaboration. Users can start by signing in with their email to instantly create or join collage “sessions.” Each session acts as a shared creative canvas, where participants can contribute visual elements — from freshly captured photos to library images or precise cutouts extracted from photos using iOS’s built-in subject isolation tools.
