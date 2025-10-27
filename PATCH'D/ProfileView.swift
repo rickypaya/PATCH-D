@@ -146,20 +146,10 @@ struct ProfileView: View {
     }
     
     private var userStatsSection: some View {
-
-
-            Text(username.isEmpty ? "Jchung" : username)
-                .font(.custom("Sanchez-Regular", size: 20))
-                .foregroundColor(Color(hex: "000000"))
-                
-
-            Text(userEmail)
-                .font(.custom("Sanchez-Regular", size: 14))
-                .foregroundColor(.black)
-            // Profile Name - Sanchez Regular 20, color 000000
-            
+        
             // Statistics
-            HStack(spacing: 40) {
+            HStack(spacing: 20) {
+    
                 // Collages count
                 VStack(spacing: 4) {
                     Text("\(userContributedCollages.count)")
@@ -169,6 +159,7 @@ struct ProfileView: View {
                         .font(.custom("Sanchez-Regular", size: 10))
                         .foregroundColor(Color(hex: "9F8860"))
                 }
+                
                 
                 Rectangle()
                    .fill(Color.black.opacity(0.3))
@@ -211,31 +202,6 @@ struct ProfileView: View {
                            .foregroundColor(Color(hex: "9F8860"))
                    }
                }
-            }
-            
-            // Share Profile button - using blockbutton-blank-green
-            Button(action: {
-                // TODO: Implement share profile functionality
-            }) {
-                ZStack {
-                    Image("blockbutton-blank-green")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(height: 50)
-                    
-                    VStack {
-                        Text("Share Profile")
-                            .font(.custom("Sanchez-Regular", size: 15))
-                            .fontWeight(.bold)
-                            .foregroundColor(Color(hex: "FFFFFF"))
-                            .padding(.top, 11) // Move text down by 1px more (10+1=11)
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                }
-            }
-            .padding(.horizontal, 40)
         }
     }
     
@@ -285,6 +251,19 @@ struct ProfileView: View {
                             // Avatar section - moved down to be nested within cream background
                             avatarView
                                 .padding(.top, 40)
+                            
+                            VStack(spacing: 10){
+                                Text(username.isEmpty ? "Jchung" : username)
+                                    .font(.custom("Sanchez-Regular", size: 20))
+                                    .foregroundColor(Color(hex: "000000"))
+                                    
+
+                                Text(userEmail)
+                                    .font(.custom("Sanchez-Regular", size: 14))
+                                    .foregroundColor(.black)
+                                // Profile Name - Sanchez Regular 20, color 000000
+                            }
+                            
                             
                             // User stats section
                             userStatsSection
